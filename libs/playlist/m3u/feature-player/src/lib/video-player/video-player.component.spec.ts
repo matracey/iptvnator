@@ -1,49 +1,34 @@
-/* import { ComponentFixture, TestBed, waitForAsync } from '@angular/core/testing';
-import { MatDividerModule } from '@angular/material/divider';
-import { MatIconModule } from '@angular/material/icon';
+import { ComponentFixture, TestBed, waitForAsync } from '@angular/core/testing';
 import { MatSidenavModule } from '@angular/material/sidenav';
-import { MatSnackBar } from '@angular/material/snack-bar';
-import { MatToolbarModule } from '@angular/material/toolbar';
-import { MatTooltipModule } from '@angular/material/tooltip';
 import { ActivatedRoute } from '@angular/router';
-import { RouterTestingModule } from '@angular/router/testing';
 import { MockStore, provideMockStore } from '@ngrx/store/testing';
+import { StorageMap } from '@ngx-pwa/local-storage';
 import { TranslateModule } from '@ngx-translate/core';
-import { MockComponent, MockModule, MockProviders } from 'ng-mocks';
-import { DataService } from '../../../../../../libs/services/src/lib/data.service';
-import { VideoPlayer } from '../../../../../../libs/shared/interfaces/src/lib/settings.interface';
-import { ChannelListContainerComponent } from '../../../../../../libs/ui/components/src/lib/channel-list-container/channel-list-container.component';
-import { EpgListComponent } from '../../../../../../libs/ui/components/src/lib/epg-list/epg-list.component';
-import { HtmlVideoPlayerComponent } from '../../../../../../libs/ui/components/src/lib/html-video-player/html-video-player.component';
-import { InfoOverlayComponent } from '../../../../../../libs/ui/components/src/lib/info-overlay/info-overlay.component';
-import { VjsPlayerComponent } from '../../../../../../libs/ui/components/src/lib/vjs-player/vjs-player.component';
-import { ElectronServiceStub } from '../../services/electron.service.stub';
+import { MockModule, MockProviders } from 'ng-mocks';
+import { of } from 'rxjs';
+import { PLAYLIST_PLAYER_ACTIONS } from '@iptvnator/playlist/shared/util';
+import { DataService, PlaylistsService, SettingsStore } from 'services';
+import { VideoPlayer } from 'shared-interfaces';
 import { VideoPlayerComponent } from './video-player.component';
-
-import { CommonModule } from '@angular/common';
-import { Actions } from '@ngrx/effects';
-import { provideMockActions } from '@ngrx/effects/testing';
-import { NgxIndexedDBService } from 'ngx-indexed-db';
-import { NgxSkeletonLoaderComponent } from 'ngx-skeleton-loader';
-import { Observable, of } from 'rxjs';
-import { initialState } from '../../../../../../apps/web/src/app/state/state';
-import { PlaylistsService } from 'services';
-
-class MatSnackBarStub {
-    open(): void {}
-}
 
 describe('VideoPlayerComponent', () => {
     let component: VideoPlayerComponent;
     let fixture: ComponentFixture<VideoPlayerComponent>;
     let mockStore: MockStore;
-    const actions$ = new Observable<Actions>();
 
     beforeEach(waitForAsync(() => {
         TestBed.configureTestingModule({
             providers: [
-                { provide: MatSnackBar, useClass: MatSnackBarStub },
-                { provide: DataService, useClass: ElectronServiceStub },
+                {
+                    provide: DataService,
+                    useValue: {
+                        sendIpcEvent: jest.fn(),
+                        listenOn: jest.fn(),
+                        removeAllListeners: jest.fn(),
+                        getAppVersion: jest.fn(() => '1.0.0'),
+                        getAppEnvironment: jest.fn(() => 'electron'),
+                    },
+                },
                 {
                     provide: ActivatedRoute,
                     useValue: {
@@ -52,30 +37,53 @@ describe('VideoPlayerComponent', () => {
                             queryParams: {
                                 url: 'https://iptvnator/list.m3u',
                             },
+                            data: {},
                         },
                     },
                 },
-                provideMockStore(),
-                provideMockActions(actions$),
-                MockProviders(NgxIndexedDBService, PlaylistsService),
+                {
+                    provide: StorageMap,
+                    useValue: { get: jest.fn(() => of(null)) },
+                },
+                {
+                    provide: SettingsStore,
+                    useValue: {
+                        player: jest.fn(() => VideoPlayer.VideoJs),
+                        showCaptions: jest.fn(() => false),
+                        settings: jest.fn(() => ({
+                            player: VideoPlayer.VideoJs,
+                            showCaptions: false,
+                        })),
+                    },
+                },
+                {
+                    provide: PLAYLIST_PLAYER_ACTIONS,
+                    useValue: { openSettings: jest.fn() },
+                },
+                provideMockStore({
+                    initialState: {
+                        playlistState: {
+                            active: undefined,
+                            currentEpgProgram: undefined,
+                            epgAvailable: false,
+                            channels: [],
+                            currentPlaylistId: undefined,
+                            playlists: {
+                                ids: [],
+                                entities: {},
+                                selectedId: '',
+                                allPlaylistsLoaded: false,
+                                selectedFilters: [],
+                            },
+                        },
+                    },
+                }),
+                MockProviders(PlaylistsService),
             ],
             imports: [
-                MockComponent(EpgListComponent),
-                MockComponent(HtmlVideoPlayerComponent),
-                MockComponent(VjsPlayerComponent),
-                MockComponent(VideoPlayerComponent),
-                MockComponent(ChannelListContainerComponent),
-                MockComponent(InfoOverlayComponent),
                 VideoPlayerComponent,
-                CommonModule,
                 TranslateModule.forRoot(),
                 MockModule(MatSidenavModule),
-                MockModule(MatIconModule),
-                MockModule(MatToolbarModule),
-                MockModule(MatTooltipModule),
-                MockModule(RouterTestingModule),
-                MockModule(MatDividerModule),
-                MockComponent(NgxSkeletonLoaderComponent),
             ],
         }).compileComponents();
     }));
@@ -84,18 +92,16 @@ describe('VideoPlayerComponent', () => {
         fixture = TestBed.createComponent(VideoPlayerComponent);
         component = fixture.componentInstance;
         mockStore = TestBed.inject(MockStore);
-
-        mockStore.setState({
-            playlistState: initialState,
-        });
-        fixture.detectChanges();
     });
 
-    it('should check default component settings', () => {
+    it('should create the component', () => {
+        expect(component).toBeTruthy();
+    });
+
+    it('should have default player settings', () => {
         expect(component.playerSettings).toEqual({
             player: VideoPlayer.VideoJs,
             showCaptions: false,
         });
     });
 });
- */

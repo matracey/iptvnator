@@ -1,56 +1,89 @@
-/* import { ComponentFixture, TestBed, waitForAsync } from '@angular/core/testing';
+import { ComponentFixture, TestBed, waitForAsync } from '@angular/core/testing';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
-import { MatDividerModule } from '@angular/material/divider';
-import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
-import { MatListModule } from '@angular/material/list';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { MatTooltipModule } from '@angular/material/tooltip';
-import { Actions } from '@ngrx/effects';
-import { provideMockActions } from '@ngrx/effects/testing';
+import { Router } from '@angular/router';
 import { MockStore, provideMockStore } from '@ngrx/store/testing';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { initialPlaylistMetaState } from 'm3u-state';
-import { MockComponent, MockModule, MockProvider } from 'ng-mocks';
-import { NgxSkeletonLoaderComponent } from 'ngx-skeleton-loader';
-import { Observable } from 'rxjs';
-import { DataService } from 'services';
-import { PLAYLIST_UPDATE, PlaylistMeta } from 'shared-interfaces';
-import { ElectronServiceStub } from '../../../../../../apps/web/src/app/services/electron.service.stub';
-import { DialogService } from '../confirm-dialog/dialog.service';
-import { PlaylistItemComponent } from './playlist-item/playlist-item.component';
+import { MockModule, MockProvider } from 'ng-mocks';
+import { of } from 'rxjs';
+import { DatabaseService, DataService, SortService } from 'services';
+import { DialogService } from 'components';
+import { PlaylistMeta } from 'shared-interfaces';
 import { RecentPlaylistsComponent } from './recent-playlists.component';
 
 describe('RecentPlaylistsComponent', () => {
     let component: RecentPlaylistsComponent;
     let fixture: ComponentFixture<RecentPlaylistsComponent>;
-    let electronService: DataService;
     let dialog: MatDialog;
     let dialogService: DialogService;
     let mockStore: MockStore;
-    const actions$ = new Observable<Actions>();
 
     beforeEach(waitForAsync(() => {
         TestBed.configureTestingModule({
             imports: [
                 RecentPlaylistsComponent,
-                MockComponent(PlaylistItemComponent),
                 MockModule(MatDialogModule),
-                MockModule(MatDividerModule),
-                MockModule(MatListModule),
-                MockModule(MatIconModule),
-                MockModule(MatInputModule),
-                MockModule(MatTooltipModule),
-                MockComponent(NgxSkeletonLoaderComponent),
                 TranslateModule.forRoot(),
             ],
             providers: [
-                { provide: DataService, useClass: ElectronServiceStub },
+                {
+                    provide: DataService,
+                    useValue: {
+                        sendIpcEvent: jest.fn(),
+                        listenOn: jest.fn(),
+                        removeAllListeners: jest.fn(),
+                        getAppVersion: jest.fn(() => '1.0.0'),
+                        getAppEnvironment: jest.fn(() => 'electron'),
+                    },
+                },
+                {
+                    provide: DatabaseService,
+                    useValue: {
+                        deletePlaylist: jest.fn(() =>
+                            Promise.resolve(true)
+                        ),
+                        deleteXtreamPlaylistContent: jest.fn(),
+                        updateXtreamPlaylistDetails: jest.fn(),
+                    },
+                },
+                {
+                    provide: SortService,
+                    useValue: {
+                        getSortOptions: jest.fn(() =>
+                            of({ by: 'title', order: 'asc' })
+                        ),
+                        sortPlaylists: jest.fn(
+                            (playlists: PlaylistMeta[]) => playlists
+                        ),
+                    },
+                },
+                {
+                    provide: Router,
+                    useValue: { navigate: jest.fn() },
+                },
                 MockProvider(DialogService),
-                MatSnackBar,
-                provideMockStore(),
-                provideMockActions(actions$),
-                MockProvider(TranslateService),
+                MockProvider(MatSnackBar),
+                MockProvider(TranslateService, {
+                    instant: jest.fn((key: string) => key),
+                }),
+                provideMockStore({
+                    initialState: {
+                        playlistState: {
+                            playlists: {
+                                ids: [],
+                                entities: {},
+                                selectedId: '',
+                                allPlaylistsLoaded: true,
+                                selectedFilters: [
+                                    'm3u',
+                                    'xtream',
+                                    'stalker',
+                                ],
+                            },
+                            currentPlaylistId: undefined,
+                        },
+                    },
+                }),
             ],
         }).compileComponents();
     }));
@@ -59,13 +92,8 @@ describe('RecentPlaylistsComponent', () => {
         fixture = TestBed.createComponent(RecentPlaylistsComponent);
         component = fixture.componentInstance;
         dialog = TestBed.inject(MatDialog);
-        electronService = TestBed.inject(DataService);
         dialogService = TestBed.inject(DialogService);
         mockStore = TestBed.inject(MockStore);
-        mockStore.setState({
-            playlistState: { playlists: initialPlaylistMetaState },
-        });
-        console.error = jest.fn();
         fixture.detectChanges();
     });
 
@@ -79,7 +107,7 @@ describe('RecentPlaylistsComponent', () => {
         expect(dialog.open).toHaveBeenCalledTimes(1);
     });
 
-    it('should send an ipc event after drop event', () => {
+    it('should dispatch after drop event', () => {
         const event = {
             previousIndex: 0,
             currentIndex: 1,
@@ -95,36 +123,25 @@ describe('RecentPlaylistsComponent', () => {
         expect(mockStore.dispatch).toHaveBeenCalledTimes(1);
     });
 
-    it('should open the confirmation dialog on remove icon click', () => {
+    it('should open the confirmation dialog on remove click', () => {
         const playlistId = '12345';
         jest.spyOn(dialogService, 'openConfirmDialog');
         component.removeClicked(playlistId);
         expect(dialogService.openConfirmDialog).toHaveBeenCalledTimes(1);
     });
 
-    it('should send an event to the main process to refresh a playlist', () => {
-        const playlistMeta: PlaylistMeta = {
-            id: 'iptv1',
-            title: 'iptv',
-            filePath: '/home/user/lists/iptv.m3u',
+    it('should navigate to playlist on getPlaylist', () => {
+        const router = TestBed.inject(Router);
+        const playlistMeta = {
+            _id: '6789',
+            title: 'Test Playlist',
         } as unknown as PlaylistMeta;
-        jest.spyOn(electronService, 'sendIpcEvent');
-        component.refreshPlaylist(playlistMeta);
-        expect(electronService.sendIpcEvent).toHaveBeenCalledWith(
-            PLAYLIST_UPDATE,
-            {
-                id: playlistMeta._id,
-                filePath: playlistMeta.filePath,
-                title: playlistMeta.title,
-            }
-        );
-    });
 
-    it('should send an event to the main process to get a playlist', () => {
-        const playlistId = '6789';
-        jest.spyOn(component.playlistClicked, 'emit');
-        component.getPlaylist({ _id: playlistId } as unknown as PlaylistMeta);
-        expect(component.playlistClicked.emit).toHaveBeenCalledTimes(1);
+        component.getPlaylist(playlistMeta);
+        expect(router.navigate).toHaveBeenCalledWith([
+            '/workspace',
+            'playlists',
+            '6789',
+        ]);
     });
 });
- */

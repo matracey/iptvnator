@@ -1,43 +1,81 @@
-/* import { inject, TestBed } from '@angular/core/testing';
+import { TestBed } from '@angular/core/testing';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
-import { TranslateModule } from '@ngx-translate/core';
-import { MockComponent, MockModule } from 'ng-mocks';
+import { MockModule, MockProvider } from 'ng-mocks';
 import { EMPTY } from 'rxjs';
-import { ConfirmDialogData } from '../<../../../apps/web/src/app/shared/components/confirm-dialog/confirm-dialog-data.interface';
-import { ConfirmDialogComponent } from '../../../../apps/web/src/app/shared/components/confirm-dialog/confirm-dialog.component';
+import { ConfirmDialogData } from './confirm-dialog.component';
 import { DialogService } from './dialog.service';
 
 describe('Service: Dialog', () => {
+    let service: DialogService;
+    let dialog: MatDialog;
+
     beforeEach(() => {
         TestBed.configureTestingModule({
-            providers: [DialogService, MatDialog],
-            imports: [
-                MockComponent(ConfirmDialogComponent),
-                MockModule(MatDialogModule),
-                TranslateModule.forRoot(),
-            ],
+            providers: [DialogService, MockProvider(MatDialog)],
+            imports: [MockModule(MatDialogModule)],
         });
+
+        service = TestBed.inject(DialogService);
+        dialog = TestBed.inject(MatDialog);
     });
 
-    it('should create the service', inject(
-        [DialogService],
-        (service: DialogService) => {
-            expect(service).toBeTruthy();
-        }
-    ));
+    it('should create the service', () => {
+        expect(service).toBeTruthy();
+    });
 
-    it('should open a confirm dialog', inject(
-        [MatDialog, DialogService],
-        (dialog: MatDialog, service: DialogService) => {
-            jest.spyOn(dialog, 'open').mockReturnValue({
-                afterClosed: () => EMPTY,
-            } as any);
-            service.openConfirmDialog({
-                title: 'Remove dialog',
-                message: 'Message',
-            } as ConfirmDialogData);
-            expect(dialog.open).toHaveBeenCalled();
-        }
-    ));
+    it('should open a confirm dialog', () => {
+        jest.spyOn(dialog, 'open').mockReturnValue({
+            afterClosed: () => EMPTY,
+        } as any);
+
+        service.openConfirmDialog({
+            title: 'Remove dialog',
+            message: 'Message',
+            onConfirm: jest.fn(),
+        } as ConfirmDialogData);
+
+        expect(dialog.open).toHaveBeenCalled();
+    });
+
+    it('should call onConfirm when dialog result is truthy', () => {
+        const onConfirmSpy = jest.fn();
+        const { Subject } = require('rxjs');
+        const afterClosed$ = new Subject();
+
+        jest.spyOn(dialog, 'open').mockReturnValue({
+            afterClosed: () => afterClosed$.asObservable(),
+        } as any);
+
+        service.openConfirmDialog({
+            title: 'Confirm',
+            message: 'Are you sure?',
+            onConfirm: onConfirmSpy,
+        } as ConfirmDialogData);
+
+        afterClosed$.next(true);
+        afterClosed$.complete();
+
+        expect(onConfirmSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('should not call onConfirm when dialog result is falsy', () => {
+        const onConfirmSpy = jest.fn();
+        const { Subject } = require('rxjs');
+        const afterClosed$ = new Subject();
+
+        jest.spyOn(dialog, 'open').mockReturnValue({
+            afterClosed: () => afterClosed$.asObservable(),
+        } as any);
+
+        service.openConfirmDialog({
+            title: 'Confirm',
+            message: 'Are you sure?',
+            onConfirm: onConfirmSpy,
+        } as ConfirmDialogData);
+
+        afterClosed$.next(false);
+        afterClosed$.complete();
+
+        expect(onConfirmSpy).not.toHaveBeenCalled();
+    });
 });
- */

@@ -1,74 +1,69 @@
-/* import { ScrollingModule } from '@angular/cdk/scrolling';
-import { KeyValue } from '@angular/common';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { FormsModule } from '@angular/forms';
-import { MatExpansionModule } from '@angular/material/expansion';
-import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
-import { MatListModule } from '@angular/material/list';
-import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
-import { MatTabsModule } from '@angular/material/tabs';
-import { MatTooltipModule } from '@angular/material/tooltip';
-import { By } from '@angular/platform-browser';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
-import { RouterTestingModule } from '@angular/router/testing';
-import { FilterPipe } from '@iptvnator/pipes';
-import { Actions } from '@ngrx/effects';
-import { provideMockActions } from '@ngrx/effects/testing';
+import { Router } from '@angular/router';
 import { MockStore, provideMockStore } from '@ngrx/store/testing';
+import { StorageMap } from '@ngx-pwa/local-storage';
 import { TranslateModule } from '@ngx-translate/core';
-import { MockModule, MockPipes, MockProviders } from 'ng-mocks';
-import { NgxIndexedDBService } from 'ngx-indexed-db';
-import { Observable } from 'rxjs';
-import * as MOCKED_PLAYLIST from '../../../../mocks/playlist.json';
-import { DataService } from '../../../services/data.service';
-import { ElectronServiceStub } from '../../../services/electron.service.stub';
-import { createChannel } from '../../../shared/channel.model';
+import { MockProviders } from 'ng-mocks';
+import { EpgService } from '@iptvnator/epg/data-access';
+import { PlaylistsService } from 'services';
+import { of } from 'rxjs';
 import { ChannelListContainerComponent } from './channel-list-container.component';
-
-class MatSnackBarStub {
-    open(): void {}
-}
-
-jest.mock('lodash', () => {
-    return {
-        __esModule: true,
-        default: {
-            groupBy: jest.fn(() => ({})),
-        },
-    };
-});
 
 describe('ChannelListContainerComponent', () => {
     let component: ChannelListContainerComponent;
     let fixture: ComponentFixture<ChannelListContainerComponent>;
     let mockStore: MockStore;
-    const actions$ = new Observable<Actions>();
 
-    beforeEach(() => {
-        TestBed.configureTestingModule({
+    beforeEach(async () => {
+        await TestBed.configureTestingModule({
             imports: [
                 ChannelListContainerComponent,
-                FormsModule,
-                MatTabsModule,
-                MockModule(MatExpansionModule),
-                MockModule(MatIconModule),
-                MockModule(MatInputModule),
-                MockModule(MatListModule),
-                MockModule(MatSnackBarModule),
-                MockModule(MatTooltipModule),
-                MockModule(ScrollingModule),
                 TranslateModule.forRoot(),
                 NoopAnimationsModule,
-                RouterTestingModule,
             ],
             providers: [
-                { provide: DataService, useClass: ElectronServiceStub },
-                { provide: MatSnackBar, useClass: MatSnackBarStub },
-                MockPipes(FilterPipe),
-                MockProviders(NgxIndexedDBService),
-                provideMockActions(actions$),
-                provideMockStore(),
+                provideMockStore({
+                    initialState: {
+                        playlistState: {
+                            active: undefined,
+                            channels: [],
+                            currentPlaylistId: '',
+                            playlists: {
+                                ids: [],
+                                entities: {},
+                                selectedId: '',
+                                allPlaylistsLoaded: false,
+                                selectedFilters: [],
+                            },
+                        },
+                    },
+                    selectors: [],
+                }),
+                {
+                    provide: EpgService,
+                    useValue: {
+                        getCurrentProgramsForChannels: jest.fn(() =>
+                            of(new Map())
+                        ),
+                        getChannelPrograms: jest.fn(),
+                        currentEpgPrograms$: of([]),
+                        epgAvailable$: of(false),
+                    },
+                },
+                MockProviders(PlaylistsService),
+                {
+                    provide: StorageMap,
+                    useValue: { get: jest.fn(() => of(null)) },
+                },
+                {
+                    provide: Router,
+                    useValue: {
+                        url: '/',
+                        events: of(),
+                        navigate: jest.fn(),
+                    },
+                },
             ],
         }).compileComponents();
     });
@@ -77,25 +72,6 @@ describe('ChannelListContainerComponent', () => {
         fixture = TestBed.createComponent(ChannelListContainerComponent);
         component = fixture.componentInstance;
         mockStore = TestBed.inject(MockStore);
-
-        // set channels
-        const channels = MOCKED_PLAYLIST.playlist.items.map((element) =>
-            createChannel({
-                ...element,
-                http: {
-                    ...element.http,
-                    origin: '', // Add the missing 'origin' property
-                },
-            })
-        );
-
-        mockStore.setState({
-            playlistState: {
-                channels,
-                active: undefined,
-            },
-        });
-        component.channelList = channels;
         fixture.detectChanges();
     });
 
@@ -103,134 +79,77 @@ describe('ChannelListContainerComponent', () => {
         expect(component).toBeTruthy();
     });
 
-    it('should render three tabs', async () => {
-        const tabGroup = fixture.debugElement.query(By.css('mat-tab-group'));
-        expect(tabGroup).toBeTruthy();
-
-        // Force another change detection cycle
-        await fixture.whenStable();
-        fixture.detectChanges();
-
-        const tabs = tabGroup.queryAll(By.css('.mat-mdc-tab'));
-        expect(tabs.length).toEqual(3);
+    it('should have empty channel list by default', () => {
+        expect(component._channelList).toHaveLength(0);
     });
 
-    it('should set channels list', () => {
-        expect(component.channelList).toHaveLength(4);
-    });
-
-    it.skip('should set groups list', () => {
-        // check first group
-        expect(
-            component.groupedChannels[
-                MOCKED_PLAYLIST.playlist.items[0].group.title
-            ][0]
-        ).toBeTruthy();
-        expect(
-            component.groupedChannels[
-                MOCKED_PLAYLIST.playlist.items[0].group.title
-            ][0]
-        ).toEqual(
+    it('should dispatch channel selection action', () => {
+        jest.spyOn(mockStore, 'dispatch');
+        const channel = {
+            id: '1',
+            url: 'http://test.com/stream',
+            name: 'Test Channel',
+            group: { title: 'Group 1' },
+        } as any;
+        component.onChannelSelected(channel);
+        expect(mockStore.dispatch).toHaveBeenCalledWith(
             expect.objectContaining({
-                id: MOCKED_PLAYLIST.playlist.items[0].url,
-                name: MOCKED_PLAYLIST.playlist.items[0].name,
-                group: MOCKED_PLAYLIST.playlist.items[0].group,
-                url: MOCKED_PLAYLIST.playlist.items[0].url,
-            })
-        );
-
-        // check second group
-        expect(
-            component.groupedChannels[
-                MOCKED_PLAYLIST.playlist.items[2].group.title
-            ][0]
-        ).toBeTruthy();
-        expect(
-            component.groupedChannels[
-                MOCKED_PLAYLIST.playlist.items[2].group.title
-            ][0]
-        ).toEqual(
-            expect.objectContaining({
-                id: MOCKED_PLAYLIST.playlist.items[2].url,
-                name: MOCKED_PLAYLIST.playlist.items[2].name,
-                group: MOCKED_PLAYLIST.playlist.items[2].group,
-                url: MOCKED_PLAYLIST.playlist.items[2].url,
+                channel,
             })
         );
     });
 
-    it('should set favorites list', () => {
-        component.favorites$.subscribe((favorites) => {
-            expect(favorites).toHaveLength(1);
-            expect(favorites).toStrictEqual([
-                MOCKED_PLAYLIST.playlist.items[0].url,
-            ]);
-        });
-    });
-
-    it('should update store after channel was selected', () => {
+    it('should dispatch favorite toggle action', () => {
         jest.spyOn(mockStore, 'dispatch');
-        component.selectChannel(component._channelList[0]);
-        fixture.detectChanges();
-        expect(mockStore.dispatch).toHaveBeenCalledTimes(1);
-    });
-
-    it('should update store after channel was favorited', () => {
-        jest.spyOn(mockStore, 'dispatch');
-        component.toggleFavoriteChannel(
-            component._channelList[0],
-            new MouseEvent('click')
+        const channel = {
+            id: '1',
+            url: 'http://test.com/stream',
+            name: 'Test Channel',
+        } as any;
+        const event = new MouseEvent('click');
+        jest.spyOn(event, 'stopPropagation');
+        component.onFavoriteToggled({ channel, event });
+        expect(event.stopPropagation).toHaveBeenCalled();
+        expect(mockStore.dispatch).toHaveBeenCalledWith(
+            expect.objectContaining({ channel })
         );
-        fixture.detectChanges();
-        expect(mockStore.dispatch).toHaveBeenCalledWith({
-            channel: component._channelList[0],
-            type: expect.stringContaining('favorites'),
-        });
-        expect(mockStore.dispatch).toHaveBeenCalledTimes(1);
     });
 
-    describe('groupsComparator', () => {
-        it('should sort numeric groups in correct order', () => {
-            const groups: KeyValue<string, any[]>[] = [
-                { key: '10', value: [] },
-                { key: '2', value: [] },
-                { key: '1', value: [] },
-            ];
+    it('should dispatch favorites reorder action', () => {
+        jest.spyOn(mockStore, 'dispatch');
+        component.onFavoritesReordered(['url1', 'url2']);
+        expect(mockStore.dispatch).toHaveBeenCalledWith(
+            expect.objectContaining({
+                channelIds: ['url1', 'url2'],
+            })
+        );
+    });
 
-            const sorted = [...groups].sort(component.groupsComparator);
+    it('should compute grouped channels', () => {
+        component.channelList = [
+            {
+                id: '1',
+                url: 'u1',
+                name: 'C1',
+                group: { title: 'News' },
+            },
+            {
+                id: '2',
+                url: 'u2',
+                name: 'C2',
+                group: { title: 'Sports' },
+            },
+            {
+                id: '3',
+                url: 'u3',
+                name: 'C3',
+                group: { title: 'News' },
+            },
+        ] as any[];
 
-            expect(sorted[0].key).toBe('1');
-            expect(sorted[1].key).toBe('2');
-            expect(sorted[2].key).toBe('10');
-        });
-
-        it('should sort mixed text and numeric groups', () => {
-            const groups: KeyValue<string, any[]>[] = [
-                { key: 'Group 10', value: [] },
-                { key: 'Group 2', value: [] },
-                { key: 'Group A', value: [] },
-            ];
-
-            const sorted = [...groups].sort(component.groupsComparator);
-
-            expect(sorted[0].key).toBe('Group 2');
-            expect(sorted[1].key).toBe('Group 10');
-            expect(sorted[2].key).toBe('Group A');
-        });
-
-        it('should fall back to alphabetical sort for non-numeric groups', () => {
-            const groups: KeyValue<string, any[]>[] = [
-                { key: 'C', value: [] },
-                { key: 'A', value: [] },
-                { key: 'B', value: [] },
-            ];
-
-            const sorted = [...groups].sort(component.groupsComparator);
-
-            expect(sorted[0].key).toBe('A');
-            expect(sorted[1].key).toBe('B');
-            expect(sorted[2].key).toBe('C');
-        });
+        const groups = component.groupedChannels();
+        expect(Object.keys(groups)).toHaveLength(2);
+        expect(groups['News']).toHaveLength(2);
+        expect(groups['Sports']).toHaveLength(1);
     });
 });
- */

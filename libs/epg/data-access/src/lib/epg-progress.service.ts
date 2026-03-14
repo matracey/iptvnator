@@ -51,7 +51,7 @@ export class EpgProgressService {
         this.initialized = true;
 
         if (window.electron?.onEpgProgress) {
-            window.electron.onEpgProgress((data) => {
+            window.electron.onEpgProgress((data: EpgImportProgress) => {
                 this.updateProgress(data);
             });
         }

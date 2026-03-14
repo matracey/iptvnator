@@ -1,44 +1,39 @@
-/* import { TestBed } from '@angular/core/testing';
-import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
-import { MockStore, provideMockStore } from '@ngrx/store/testing';
+import { TestBed } from '@angular/core/testing';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { TranslateService } from '@ngx-translate/core';
-import { invoke } from '@tauri-apps/api/core';
-import { MockModule, MockProviders } from 'ng-mocks';
-import { DataService } from './data.service';
+import { MockProviders } from 'ng-mocks';
+import { firstValueFrom, take, toArray } from 'rxjs';
 import { EpgService } from './epg.service';
-
-jest.mock('@tauri-apps/api/core', () => ({
-    invoke: jest.fn(),
-    isTauri: () => true,
-}));
 
 describe('EpgService', () => {
     let service: EpgService;
     let snackBar: MatSnackBar;
-    let store: MockStore;
     let translateService: TranslateService;
-    let dispatchSpy: jest.SpyInstance;
+
+    const mockElectron = {
+        fetchEpg: jest.fn(),
+        getChannelPrograms: jest.fn(),
+        getCurrentProgramsBatch: jest.fn(),
+    };
 
     beforeEach(() => {
+        (window as any).electron = mockElectron;
+
         TestBed.configureTestingModule({
             providers: [
                 EpgService,
-                MockProviders(DataService, TranslateService, MatSnackBar),
-                provideMockStore(),
+                MockProviders(TranslateService, MatSnackBar),
             ],
-            imports: [MockModule(MatSnackBarModule)],
         });
 
         service = TestBed.inject(EpgService);
         snackBar = TestBed.inject(MatSnackBar);
-        store = TestBed.inject(MockStore);
         translateService = TestBed.inject(TranslateService);
 
         jest.spyOn(translateService, 'instant').mockImplementation(
-            (key) => key
+            (key: string) => key
         );
         jest.spyOn(snackBar, 'open');
-        dispatchSpy = jest.spyOn(store, 'dispatch');
 
         jest.spyOn(console, 'error').mockImplementation(() => undefined);
         jest.spyOn(console, 'log').mockImplementation(() => undefined);
@@ -46,6 +41,8 @@ describe('EpgService', () => {
 
     afterEach(() => {
         jest.clearAllMocks();
+        service.clearCache();
+        delete (window as any).electron;
     });
 
     it('should create a service instance', () => {
@@ -53,66 +50,213 @@ describe('EpgService', () => {
     });
 
     describe('fetchEpg', () => {
-        it('should show success notification on successful fetch', async () => {
-            (invoke as jest.Mock).mockResolvedValueOnce({});
+        it('should set epgAvailable to true on successful fetch', async () => {
+            mockElectron.fetchEpg.mockResolvedValueOnce({ success: true });
             service.fetchEpg(['http://example.com/epg.xml']);
 
             await new Promise((resolve) => setTimeout(resolve, 0));
-            expect(snackBar.open).toHaveBeenCalledWith(
-                'EPG.FETCH_SUCCESS',
-                null,
-                expect.any(Object)
-            );
+            const available = await firstValueFrom(service.epgAvailable$);
+            expect(available).toBe(true);
         });
 
-        it('should show error notification on fetch failure', async () => {
-            (invoke as jest.Mock).mockRejectedValueOnce(new Error('Failed'));
+        it('should set epgAvailable to false and show error on failure', async () => {
+            mockElectron.fetchEpg.mockRejectedValueOnce(
+                new Error('Failed')
+            );
             service.fetchEpg(['http://example.com/epg.xml']);
 
             await new Promise((resolve) => setTimeout(resolve, 0));
-            expect(snackBar.open).toHaveBeenCalledWith(
-                'EPG.ERROR',
-                'CLOSE',
-                expect.any(Object)
-            );
+            const available = await firstValueFrom(service.epgAvailable$);
+            expect(available).toBe(false);
+            expect(snackBar.open).toHaveBeenCalled();
+        });
+
+        it('should not call electron when urls are empty', () => {
+            service.fetchEpg([]);
+            expect(mockElectron.fetchEpg).not.toHaveBeenCalled();
         });
     });
 
     describe('getChannelPrograms', () => {
-        it('should update programs and set EPG flag to true when programs exist', (done) => {
+        it('should update programs and set EPG available when programs exist', async () => {
+            const now = new Date();
             const mockPrograms = [
                 {
-                    start: new Date().toISOString(),
-                    stop: new Date().toISOString(),
+                    start: now.toISOString(),
+                    stop: new Date(
+                        now.getTime() + 3600000
+                    ).toISOString(),
                     title: 'Test',
+                    channel: 'test-channel',
+                    desc: null,
+                    category: null,
                 },
             ];
-            (invoke as jest.Mock).mockResolvedValueOnce(mockPrograms);
+            mockElectron.getChannelPrograms.mockResolvedValueOnce(
+                mockPrograms
+            );
 
             service.getChannelPrograms('test-channel');
 
-            service.currentEpgPrograms$.subscribe((programs) => {
-                expect(programs).toHaveLength(1);
-                expect(dispatchSpy).toHaveBeenCalledWith(
-                    expect.objectContaining({ value: true })
-                );
-                done();
-            });
+            await new Promise((resolve) => setTimeout(resolve, 0));
+            const programs = await firstValueFrom(
+                service.currentEpgPrograms$
+            );
+            expect(programs).toHaveLength(1);
+            const available = await firstValueFrom(service.epgAvailable$);
+            expect(available).toBe(true);
         });
 
-        it('should set EPG flag to false when no programs found', (done) => {
-            (invoke as jest.Mock).mockResolvedValueOnce([]);
+        it('should set EPG available to false when no programs found', async () => {
+            mockElectron.getChannelPrograms.mockResolvedValueOnce([]);
 
             service.getChannelPrograms('test-channel');
 
-            service.currentEpgPrograms$.subscribe((programs) => {
-                expect(programs).toHaveLength(0);
-                expect(dispatchSpy).toHaveBeenCalledWith(
-                    expect.objectContaining({ value: false })
-                );
-                done();
-            });
+            await new Promise((resolve) => setTimeout(resolve, 0));
+            const programs = await firstValueFrom(
+                service.currentEpgPrograms$
+            );
+            expect(programs).toHaveLength(0);
+            const available = await firstValueFrom(service.epgAvailable$);
+            expect(available).toBe(false);
+        });
+    });
+
+    describe('getCurrentProgramForChannel', () => {
+        it('should return null for empty channelId', async () => {
+            const result = await firstValueFrom(
+                service.getCurrentProgramForChannel('')
+            );
+            expect(result).toBeNull();
+        });
+
+        it('should return current program when found', async () => {
+            const now = new Date();
+            const mockPrograms = [
+                {
+                    start: new Date(
+                        now.getTime() - 1800000
+                    ).toISOString(),
+                    stop: new Date(
+                        now.getTime() + 1800000
+                    ).toISOString(),
+                    title: 'Current Show',
+                    channel: 'ch1',
+                    desc: null,
+                    category: null,
+                },
+            ];
+            mockElectron.getChannelPrograms.mockResolvedValueOnce(
+                mockPrograms
+            );
+
+            const result = await firstValueFrom(
+                service.getCurrentProgramForChannel('ch1')
+            );
+            expect(result).toBeTruthy();
+            expect(result!.title).toBe('Current Show');
+        });
+
+        it('should use cache on subsequent calls', async () => {
+            const now = new Date();
+            const mockPrograms = [
+                {
+                    start: new Date(
+                        now.getTime() - 1800000
+                    ).toISOString(),
+                    stop: new Date(
+                        now.getTime() + 1800000
+                    ).toISOString(),
+                    title: 'Cached Show',
+                    channel: 'ch1',
+                    desc: null,
+                    category: null,
+                },
+            ];
+            mockElectron.getChannelPrograms.mockResolvedValue(mockPrograms);
+
+            await firstValueFrom(
+                service.getCurrentProgramForChannel('ch1')
+            );
+            await firstValueFrom(
+                service.getCurrentProgramForChannel('ch1')
+            );
+
+            expect(mockElectron.getChannelPrograms).toHaveBeenCalledTimes(
+                1
+            );
+        });
+    });
+
+    describe('getCurrentProgramsForChannels', () => {
+        it('should return empty map for empty channel list', async () => {
+            const result = await firstValueFrom(
+                service.getCurrentProgramsForChannels([])
+            );
+            expect(result.size).toBe(0);
+        });
+
+        it('should fetch programs for multiple channels', async () => {
+            const now = new Date();
+            const makeProgram = (ch: string) => [
+                {
+                    start: new Date(
+                        now.getTime() - 1800000
+                    ).toISOString(),
+                    stop: new Date(
+                        now.getTime() + 1800000
+                    ).toISOString(),
+                    title: `Show on ${ch}`,
+                    channel: ch,
+                    desc: null,
+                    category: null,
+                },
+            ];
+
+            mockElectron.getChannelPrograms.mockImplementation(
+                (channelId: string) =>
+                    Promise.resolve(makeProgram(channelId))
+            );
+
+            const result = await firstValueFrom(
+                service.getCurrentProgramsForChannels(['ch1', 'ch2'])
+            );
+            expect(result.size).toBe(2);
+            expect(result.get('ch1')?.title).toBe('Show on ch1');
+            expect(result.get('ch2')?.title).toBe('Show on ch2');
+        });
+    });
+
+    describe('clearCache', () => {
+        it('should clear cached programs', async () => {
+            const now = new Date();
+            const mockPrograms = [
+                {
+                    start: new Date(
+                        now.getTime() - 1800000
+                    ).toISOString(),
+                    stop: new Date(
+                        now.getTime() + 1800000
+                    ).toISOString(),
+                    title: 'Show',
+                    channel: 'ch1',
+                    desc: null,
+                    category: null,
+                },
+            ];
+            mockElectron.getChannelPrograms.mockResolvedValue(mockPrograms);
+
+            await firstValueFrom(
+                service.getCurrentProgramForChannel('ch1')
+            );
+            service.clearCache();
+            await firstValueFrom(
+                service.getCurrentProgramForChannel('ch1')
+            );
+
+            expect(mockElectron.getChannelPrograms).toHaveBeenCalledTimes(
+                2
+            );
         });
     });
 });
- */

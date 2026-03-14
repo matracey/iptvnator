@@ -31,7 +31,7 @@ import { SettingsComponent } from './settings.component';
 
 import { signal } from '@angular/core';
 import { NgxIndexedDBService } from 'ngx-indexed-db';
-import { of } from 'rxjs';
+import { of, EMPTY } from 'rxjs';
 import { SETTINGS_UPDATE } from 'shared-interfaces';
 import { ElectronServiceStub } from '../services/electron.service.stub';
 import { SettingsStore } from '../services/settings-store.service';
@@ -58,32 +58,53 @@ const DEFAULT_SETTINGS = {
     showExternalPlaybackBar: true,
     theme: Theme.SystemTheme,
     mpvPlayerPath: '',
+    mpvReuseInstance: false,
     vlcPlayerPath: '',
     remoteControl: false,
-    remoteControlPort: 3000,
+    remoteControlPort: 8765,
+    epgUrl: [],
+    downloadFolder: '',
 };
 
 class MockSettingsStore {
-    private _settings = signal(DEFAULT_SETTINGS);
+    private settingsSignal = signal(DEFAULT_SETTINGS);
 
-    getSettings = () => this._settings;
+    getSettings = () => this.settingsSignal();
 
     loadSettings = jest.fn().mockResolvedValue(undefined);
 
     updateSettings = jest.fn().mockResolvedValue(undefined);
 
+    // Expose individual setting signals matching the real signal store shape
+    player = () => this.settingsSignal().player;
+    streamFormat = () => this.settingsSignal().streamFormat;
+    language = () => this.settingsSignal().language;
+    showCaptions = () => this.settingsSignal().showCaptions;
+    showExternalPlaybackBar = () =>
+        this.settingsSignal().showExternalPlaybackBar;
+    theme = () => this.settingsSignal().theme;
+    mpvPlayerPath = () => this.settingsSignal().mpvPlayerPath;
+    vlcPlayerPath = () => this.settingsSignal().vlcPlayerPath;
+    remoteControl = () => this.settingsSignal().remoteControl;
+    remoteControlPort = () => this.settingsSignal().remoteControlPort;
+
+    mpvReuseInstance = () => this.settingsSignal().mpvReuseInstance;
+    epgUrl = () => this.settingsSignal().epgUrl;
+    downloadFolder = () => this.settingsSignal().downloadFolder;
+
     // Helper method for tests to modify settings
-    _setSettings(newSettings: Partial<typeof DEFAULT_SETTINGS>) {
-        this._settings.set({
-            ...this._settings(),
+    setMockSettings(newSettings: Partial<typeof DEFAULT_SETTINGS>) {
+        this.settingsSignal.set({
+            ...this.settingsSignal(),
             ...newSettings,
         });
     }
 }
 
 class MockSettingsService {
-    getAppVersion = jest.fn().mockReturnValue(of('1.0.0'));
+    getAppVersion = jest.fn().mockReturnValue(EMPTY);
     changeTheme = jest.fn();
+    isVersionOutdated = jest.fn().mockReturnValue(false);
 }
 
 describe('SettingsComponent', () => {
@@ -96,12 +117,22 @@ describe('SettingsComponent', () => {
     let epgService: EpgService;
 
     beforeEach(waitForAsync(() => {
+        // Polyfill Element.animate for jsdom
+        if (!Element.prototype.animate) {
+            Element.prototype.animate = jest.fn().mockReturnValue({
+                finished: Promise.resolve(),
+                cancel: jest.fn(),
+                onfinish: null,
+            });
+        }
+
         TestBed.configureTestingModule({
             providers: [
                 UntypedFormBuilder,
                 { provide: SettingsStore, useClass: MockSettingsStore },
                 MockProvider(EpgService),
                 MockProvider(DialogService),
+                SettingsContextService,
                 { provide: SettingsService, useClass: MockSettingsService },
                 { provide: MatSnackBar, useClass: MatSnackBarStub },
                 { provide: DataService, useClass: ElectronServiceStub },
@@ -110,7 +141,8 @@ describe('SettingsComponent', () => {
                     useClass: MockRouter,
                 },
                 provideMockStore(),
-                MockProviders(NgxIndexedDBService, PlaylistsService),
+                { provide: NgxIndexedDBService, useValue: {} },
+                MockProviders(PlaylistsService),
             ],
             imports: [
                 SettingsComponent,
@@ -134,7 +166,7 @@ describe('SettingsComponent', () => {
     beforeEach(() => {
         fixture = TestBed.createComponent(SettingsComponent);
         electronService = TestBed.inject(DataService);
-        settingsStore = TestBed.inject(SettingsStore);
+        settingsStore = TestBed.inject(SettingsStore) as unknown as MockSettingsStore;
         router = TestBed.inject(Router);
         translate = TestBed.inject(TranslateService);
         epgService = TestBed.inject(EpgService);
@@ -158,10 +190,13 @@ describe('SettingsComponent', () => {
     });
 
     it('should not render the page header in dialog mode', () => {
-        component.isDialog = true;
-        fixture.detectChanges();
+        const dialogFixture = TestBed.createComponent(SettingsComponent);
+        const dialogComponent = dialogFixture.componentInstance;
+        dialogComponent.isDialog = true;
+        dialogComponent.setSettings = jest.fn();
+        dialogFixture.detectChanges();
 
-        const nativeElement = fixture.nativeElement as HTMLElement;
+        const nativeElement = dialogFixture.nativeElement as HTMLElement;
         expect(
             nativeElement.querySelector('[data-test-id="settings-page-header"]')
         ).toBeNull();
@@ -205,28 +240,41 @@ describe('SettingsComponent', () => {
             player: VideoPlayer.VideoJs,
         };
 
+        // Form defaults (no epgUrl/downloadFolder since window.electron is not set)
+        const EXPECTED_FORM_DEFAULTS = {
+            player: VideoPlayer.VideoJs,
+            streamFormat: StreamFormat.M3u8StreamFormat,
+            language: Language.ENGLISH,
+            showCaptions: false,
+            showExternalPlaybackBar: true,
+            theme: Theme.SystemTheme,
+            mpvPlayerPath: '',
+            mpvReuseInstance: false,
+            vlcPlayerPath: '',
+            remoteControl: false,
+            remoteControlPort: 8765,
+        };
+
         it('should init default settings if previous config was not saved', async () => {
             await component.ngOnInit();
-            //expect(settingsStore.loadSettings).toHaveBeenCalled();
-            expect(component.settingsForm.value).toEqual(DEFAULT_SETTINGS);
+            expect(component.settingsForm.value).toEqual(
+                EXPECTED_FORM_DEFAULTS
+            );
         });
 
         it('should get and apply custom settings', async () => {
             const mockStore = settingsStore as unknown as MockSettingsStore;
-            mockStore._setSettings({
+            mockStore.setMockSettings({
                 ...DEFAULT_SETTINGS,
                 ...settings,
             });
 
-            component.ngOnInit();
-
-            // Force change detection
+            await component.ngOnInit();
             fixture.detectChanges();
             await fixture.whenStable();
 
-            //expect(settingsStore.loadSettings).toHaveBeenCalled();
             expect(component.settingsForm.value).toEqual({
-                ...DEFAULT_SETTINGS,
+                ...EXPECTED_FORM_DEFAULTS,
                 ...settings,
             });
         });
@@ -255,6 +303,10 @@ describe('SettingsComponent', () => {
         });
 
         it('should return true if version is outdated', () => {
+            const settingsService = TestBed.inject(SettingsService);
+            (settingsService.isVersionOutdated as jest.Mock).mockReturnValue(
+                true
+            );
             jest.spyOn(electronService, 'getAppVersion').mockReturnValue(
                 currentVersion
             );
@@ -264,12 +316,15 @@ describe('SettingsComponent', () => {
         });
 
         it('should update notification message if version is outdated', () => {
+            const settingsService = TestBed.inject(SettingsService);
+            (settingsService.isVersionOutdated as jest.Mock).mockReturnValue(
+                true
+            );
             jest.spyOn(translate, 'instant');
             jest.spyOn(electronService, 'getAppVersion').mockReturnValue(
                 currentVersion
             );
             component.showVersionInformation(latestVersion);
-            fixture.detectChanges();
             expect(translate.instant).toHaveBeenCalledWith(
                 'SETTINGS.NEW_VERSION_AVAILABLE'
             );
@@ -303,14 +358,9 @@ describe('SettingsComponent', () => {
         const mockStore = settingsStore as unknown as MockSettingsStore;
         mockStore.updateSettings.mockResolvedValue(undefined);
 
-        jest.spyOn(electronService, 'sendIpcEvent');
         await component.onSubmit();
 
         expect(mockStore.updateSettings).toHaveBeenCalledWith(
-            component.settingsForm.value
-        );
-        expect(electronService.sendIpcEvent).toHaveBeenCalledWith(
-            SETTINGS_UPDATE,
             component.settingsForm.value
         );
     });

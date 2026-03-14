@@ -49,4 +49,27 @@ describe('ExternalPlaybackDockComponent', () => {
         expect(closeSpy).toHaveBeenCalled();
         expect(dismissSpy).toHaveBeenCalled();
     });
+
+    it('shows spinner only in launching state', () => {
+        expect(component.showSpinner()).toBe(true);
+
+        fixture.componentRef.setInput('session', {
+            ...session,
+            status: 'playing',
+        });
+        fixture.detectChanges();
+        expect(component.showSpinner()).toBe(false);
+    });
+
+    it('shows close button when canClose is true and not error', () => {
+        expect(component.showCloseButton()).toBe(true);
+
+        fixture.componentRef.setInput('session', {
+            ...session,
+            status: 'error',
+            error: 'Failed to launch',
+        });
+        fixture.detectChanges();
+        expect(component.showCloseButton()).toBe(false);
+    });
 });

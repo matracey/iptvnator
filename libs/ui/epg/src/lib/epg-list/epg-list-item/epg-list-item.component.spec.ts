@@ -5,15 +5,15 @@ import { MatListModule } from '@angular/material/list';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MomentDatePipe } from '@iptvnator/pipes';
 import { TranslateModule } from '@ngx-translate/core';
-import moment from 'moment';
+import { format } from 'date-fns';
 import { MockModule, MockPipe } from 'ng-mocks';
 import { EpgProgram } from 'shared-interfaces';
 import { EpgItemDescriptionComponent } from '../epg-item-description/epg-item-description.component';
 import { EpgListItemComponent } from './epg-list-item.component';
 
 const EPG_PROGRAM_ITEM = {
-    start: moment(Date.now()).format('YYYYMMDD'),
-    stop: moment(Date.now()).format('YYYYMMDD'),
+    start: format(new Date(), 'yyyyMMdd'),
+    stop: format(new Date(), 'yyyyMMdd'),
     channel: '12345',
     title: [{ lang: 'en', value: 'NOW on PBS' }],
     desc: [
@@ -50,8 +50,8 @@ const EPG_PROGRAM_ITEM = {
     ],
     audio: [],
     _attributes: {
-        start: moment(Date.now()).format('YYYYMMDD'),
-        stop: moment(Date.now()).format('YYYYMMDD'),
+        start: format(new Date(), 'yyyyMMdd'),
+        stop: format(new Date(), 'yyyyMMdd'),
     },
 };
 

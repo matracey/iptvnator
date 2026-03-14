@@ -5,6 +5,11 @@ import { ExternalPlayerSession, VideoPlayer } from 'shared-interfaces';
 import { SettingsStore } from './settings-store.service';
 import { PlayerService } from './player.service';
 
+// Mock the dynamic import so embedded-player branch can resolve synchronously
+jest.mock('@iptvnator/portal/xtream/feature', () => ({
+    PlayerDialogComponent: class MockPlayerDialog {},
+}));
+
 describe('PlayerService', () => {
     let service: PlayerService;
     const dialog = {
@@ -56,6 +61,9 @@ describe('PlayerService', () => {
             streamUrl: 'https://example.com/video.mp4',
             title: 'Example Video',
         });
+
+        // Allow the dynamic import promise to resolve
+        await Promise.resolve();
 
         expect(dialog.open).toHaveBeenCalled();
         expect(dataService.sendIpcEvent).not.toHaveBeenCalled();

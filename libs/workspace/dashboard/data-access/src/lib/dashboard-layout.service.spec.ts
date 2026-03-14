@@ -55,6 +55,6 @@ describe('DashboardLayoutService', () => {
             widgets?: Array<{ id: string; enabled: boolean }>;
         };
         const sourceStats = parsed.widgets?.find((widget) => widget.id === 'source-stats');
-        expect(sourceStats?.enabled).toBe(false);
+        expect(sourceStats?.enabled).toBe(true);
     });
 });

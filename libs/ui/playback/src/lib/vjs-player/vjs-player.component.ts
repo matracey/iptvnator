@@ -1,4 +1,5 @@
 import {
+    ChangeDetectionStrategy,
     Component,
     ElementRef,
     EventEmitter,
@@ -85,6 +86,7 @@ type VideoJsPlayer = Omit<
     styleUrls: ['./vjs-player.component.scss'],
     encapsulation: ViewEncapsulation.None,
     standalone: true,
+    changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class VjsPlayerComponent implements OnInit, OnChanges, OnDestroy {
     /** DOM-element reference */

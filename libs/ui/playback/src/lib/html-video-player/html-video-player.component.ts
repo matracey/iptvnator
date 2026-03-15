@@ -1,4 +1,5 @@
 import {
+    ChangeDetectionStrategy,
     Component,
     ElementRef,
     EventEmitter,
@@ -25,6 +26,7 @@ import { Channel } from 'shared-interfaces';
     templateUrl: './html-video-player.component.html',
     styleUrls: ['./html-video-player.component.scss'],
     standalone: true,
+    changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class HtmlVideoPlayerComponent implements OnInit, OnChanges, OnDestroy {
     /** Channel to play  */

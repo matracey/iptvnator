@@ -1,4 +1,5 @@
 import {
+    ChangeDetectionStrategy,
     Component,
     ElementRef,
     EventEmitter,
@@ -40,6 +41,7 @@ Artplayer.AUTO_PLAYBACK_TIMEOUT = 10000;
             }
         `,
     ],
+    changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ArtPlayerComponent implements OnInit, OnDestroy, OnChanges {
     @Input() channel!: Channel;

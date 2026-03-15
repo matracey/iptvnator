@@ -1,4 +1,6 @@
 import {
+    ChangeDetectionStrategy,
+    ChangeDetectorRef,
     Component,
     ElementRef,
     inject,
@@ -82,6 +84,7 @@ import { ChannelActions } from 'm3u-state';
     `,
     styleUrls: ['./audio-player.component.scss'],
     imports: [MatSliderModule, MatIconModule, MatButtonModule, FormsModule],
+    changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AudioPlayerComponent implements OnChanges {
     @Input() icon!: string;
@@ -94,6 +97,7 @@ export class AudioPlayerComponent implements OnChanges {
     @ViewChild('audio', { static: true }) audio!: ElementRef<HTMLAudioElement>;
 
     private store = inject(Store);
+    private cdr = inject(ChangeDetectorRef);
 
     ngOnChanges(changes: SimpleChanges): void {
         this.audio.nativeElement.src = changes['url'].currentValue;
@@ -109,11 +113,13 @@ export class AudioPlayerComponent implements OnChanges {
             });
         }
         this.playState = 'play';
+        this.cdr.markForCheck();
     }
 
     stop() {
         this.audio.nativeElement.pause();
         this.playState = 'paused';
+        this.cdr.markForCheck();
     }
 
     mute() {

@@ -58,6 +58,9 @@ declare global {
                 urls: string[]
             ) => Promise<{ success: boolean; message?: string }>;
             getChannelPrograms: (channelId: string) => Promise<any>;
+            getCurrentProgramsBatch: (
+                channelIds: string[]
+            ) => Promise<Record<string, any>>;
             getEpgChannels: () => Promise<any>;
             getEpgChannelsByRange: (
                 skip: number,

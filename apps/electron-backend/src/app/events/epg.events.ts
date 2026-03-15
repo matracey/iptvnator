@@ -1,4 +1,4 @@
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, lte, gte, sql } from 'drizzle-orm';
 import { app, BrowserWindow, ipcMain } from 'electron';
 import * as path from 'path';
 import { EpgProgram } from 'shared-interfaces';
@@ -53,6 +53,14 @@ export default class EpgEvents {
             'GET_CHANNEL_PROGRAMS',
             async (_event, args: { channelId: string }) => {
                 return this.handleGetChannelPrograms(args.channelId);
+            }
+        );
+
+        // Get current programs for multiple channels in a single batch query
+        ipcMain.handle(
+            'GET_CURRENT_PROGRAMS_BATCH',
+            async (_event, args: { channelIds: string[] }) => {
+                return this.handleGetCurrentProgramsBatch(args.channelIds);
             }
         );
 
@@ -471,6 +479,91 @@ export default class EpgEvents {
                 error
             );
             return [];
+        }
+    }
+
+    /**
+     * Get the current EPG program for multiple channels in a single query.
+     * Returns a record mapping channelId to its current program (or null).
+     */
+    private static async handleGetCurrentProgramsBatch(
+        channelIds: string[]
+    ): Promise<Record<string, EpgProgram | null>> {
+        const result: Record<string, EpgProgram | null> = {};
+        if (!channelIds || channelIds.length === 0) {
+            return result;
+        }
+
+        // Filter out empty/null/undefined channel IDs
+        const validIds = channelIds.filter((id) => id?.trim());
+        if (validIds.length === 0) {
+            return result;
+        }
+
+        try {
+            const db = await getDatabase();
+            const now = new Date().toISOString();
+
+            // Batch query: get current program for all requested channels
+            const rows = await db
+                .select()
+                .from(schema.epgPrograms)
+                .where(
+                    and(
+                        inArray(schema.epgPrograms.channelId, validIds),
+                        lte(schema.epgPrograms.start, now),
+                        gte(schema.epgPrograms.stop, now)
+                    )
+                );
+
+            // Build result map — first match per channel wins
+            for (const row of rows) {
+                if (!result[row.channelId]) {
+                    result[row.channelId] = this.transformDbRowToEpgProgram(row);
+                }
+            }
+
+            // For channels not matched by ID, try display name lookup
+            // Uses substring matching (LIKE) to match the original single-channel behavior
+            const unmatchedIds = validIds.filter((id) => !(id in result));
+            if (unmatchedIds.length > 0) {
+                for (const name of unmatchedIds) {
+                    const channel = await db
+                        .select()
+                        .from(schema.epgChannels)
+                        .where(
+                            sql`LOWER(${schema.epgChannels.displayName}) LIKE LOWER(${'%' + name + '%'})`
+                        )
+                        .limit(1);
+
+                    if (channel.length > 0) {
+                        const programRows = await db
+                            .select()
+                            .from(schema.epgPrograms)
+                            .where(
+                                and(
+                                    eq(schema.epgPrograms.channelId, channel[0].id),
+                                    lte(schema.epgPrograms.start, now),
+                                    gte(schema.epgPrograms.stop, now)
+                                )
+                            )
+                            .limit(1);
+
+                        if (programRows.length > 0) {
+                            result[name] = this.transformDbRowToEpgProgram(programRows[0]);
+                        }
+                    }
+                }
+            }
+
+            return result;
+        } catch (error) {
+            console.error(
+                this.loggerLabel,
+                'Error getting batch current programs:',
+                error
+            );
+            return result;
         }
     }
 

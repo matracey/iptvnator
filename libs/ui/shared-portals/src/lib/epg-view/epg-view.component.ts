@@ -1,5 +1,5 @@
 import { DatePipe } from '@angular/common';
-import { Component, Input, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, Input, inject } from '@angular/core';
 import { MatIconButton } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIcon } from '@angular/material/icon';
@@ -13,6 +13,7 @@ import { EpgItem } from 'shared-interfaces';
     templateUrl: './epg-view.component.html',
     imports: [DatePipe, MatIconButton, MatIcon, MatListModule, TranslateModule],
     styleUrls: ['./epg-view.component.scss'],
+    changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class EpgViewComponent {
     @Input() epgItems: EpgItem[] = [];

@@ -1,4 +1,4 @@
-import { Component, computed, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 
 @Component({
     selector: 'app-progress-capsule',
@@ -48,6 +48,7 @@ import { Component, computed, input } from '@angular/core';
             }
         `,
     ],
+    changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ProgressCapsuleComponent {
     readonly progress = input.required<number>();

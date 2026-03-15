@@ -8,6 +8,13 @@
     "targets": {
         "lint": {
             "executor": "@nx/eslint:lint"
+        },
+        "test": {
+            "executor": "@nx/jest:jest",
+            "outputs": ["{workspaceRoot}/coverage/libs/portal/xtream/data-access"],
+            "options": {
+                "jestConfig": "libs/portal/xtream/data-access/jest.config.ts"
+            }
         }
     }
 }

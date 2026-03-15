@@ -30,7 +30,6 @@
                 "allowedCommonJsDependencies": [
                     "qrcode",
                     "iptv-playlist-parser",
-                    "moment",
                     "mpegts.js",
                     "videojs-contrib-quality-levels",
                     "videojs-quality-selector-hls",

@@ -2,7 +2,7 @@ import { NgStyle } from '@angular/common';
 import { ChangeDetectionStrategy, Component, Input, OnChanges, signal, SimpleChanges } from '@angular/core';
 import { MomentDatePipe } from '@iptvnator/pipes';
 import { TranslatePipe } from '@ngx-translate/core';
-import moment from 'moment';
+import { parse, differenceInMilliseconds } from 'date-fns';
 import { Channel, EpgProgram } from 'shared-interfaces';
 
 @Component({
@@ -69,19 +69,21 @@ export class InfoOverlayComponent implements OnChanges {
      * @param stop program stop time
      */
     setProgramDuration(start: string | number, stop: string | number): void {
-        const stopMoment = moment(stop, 'YYYYMMDDHHmm ZZ');
-        const startMoment = moment(start, 'YYYYMMDDHHmm ZZ');
-        this.stop = stopMoment.toISOString();
-        this.start = startMoment.toISOString();
-        const timeNow = moment(Date.now());
+        const stopDate = typeof stop === 'string' ? this.parseEpgDate(stop) : new Date(stop);
+        const startDate = typeof start === 'string' ? this.parseEpgDate(start) : new Date(start);
+        this.stop = stopDate.toISOString();
+        this.start = startDate.toISOString();
+        const timeNow = new Date();
 
-        this.generalDuration = moment
-            .duration(stopMoment.diff(startMoment))
-            .asMilliseconds();
+        this.generalDuration = differenceInMilliseconds(stopDate, startDate);
+        this.finishedDuration = differenceInMilliseconds(stopDate, timeNow);
+    }
 
-        this.finishedDuration = moment
-            .duration(stopMoment.diff(timeNow))
-            .asMilliseconds();
+    private parseEpgDate(value: string): Date {
+        // Try ISO 8601 first, then legacy EPG format
+        const isoDate = new Date(value);
+        if (!isNaN(isoDate.getTime())) return isoDate;
+        return parse(value, 'yyyyMMddHHmmss XX', new Date());
     }
 
     /**

@@ -19,12 +19,6 @@ import { TranslatePipe } from '@ngx-translate/core';
 import { Channel, EpgProgram } from 'shared-interfaces';
 import { ChannelListItemComponent } from '../channel-list-item/channel-list-item.component';
 
-/** Enriched channel with pre-computed EPG and progress data */
-export interface EnrichedChannel extends Channel {
-    epgProgram: EpgProgram | null | undefined;
-    progressPercentage: number;
-}
-
 @Component({
     selector: 'app-all-channels-view',
     templateUrl: './all-channels-view.component.html',

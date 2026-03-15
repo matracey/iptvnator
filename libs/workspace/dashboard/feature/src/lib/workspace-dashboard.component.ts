@@ -45,6 +45,10 @@ import { DashboardWidgetHostComponent } from 'workspace-dashboard-ui';
 export class WorkspaceDashboardComponent {
     private readonly store = inject(Store);
     private readonly translate = inject(TranslateService);
+    readonly layoutService = inject(DashboardLayoutService);
+
+    // Data reload is handled reactively by DashboardDataService
+    // via Router NavigationEnd events
 
     readonly editMode = signal(false);
     readonly playlists = this.store.selectSignal(selectAllPlaylistsMeta);
@@ -73,10 +77,6 @@ export class WorkspaceDashboardComponent {
         this.allWidgets().filter((widget) => widget.enabled)
     );
 
-    constructor(readonly layoutService: DashboardLayoutService) {
-        // Data reload is handled reactively by DashboardDataService
-        // via Router NavigationEnd events
-    }
 
     toggleEditMode(): void {
         this.editMode.update((value) => !value);

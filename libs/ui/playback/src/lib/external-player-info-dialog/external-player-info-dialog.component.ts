@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDialogModule } from '@angular/material/dialog';
@@ -65,6 +65,7 @@ import { TranslateModule } from '@ngx-translate/core';
         RouterLink,
         TranslateModule,
     ],
+    changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ExternalPlayerInfoDialogComponent {
     openUrl(url: string) {

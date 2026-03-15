@@ -1,4 +1,4 @@
-import { Component, computed, inject, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { MatIconButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
 import { MatTooltip } from '@angular/material/tooltip';
@@ -23,6 +23,7 @@ import { ChannelListContainerComponent } from 'components';
         RouterLink,
         TranslatePipe,
     ],
+    changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SidebarComponent {
     readonly channels = input<Channel[]>([]);

@@ -1,4 +1,5 @@
 import {
+    ChangeDetectionStrategy,
     Component,
     computed,
     inject,
@@ -50,6 +51,7 @@ import { PortalInlinePlayerComponent } from '../portal-inline-player/portal-inli
         SafePipe,
         TranslatePipe,
     ],
+    changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class VodDetailsComponent {
     // ============ Inputs ============

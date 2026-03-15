@@ -198,24 +198,27 @@ describe('EpgService', () => {
 
         it('should fetch programs for multiple channels', async () => {
             const now = new Date();
-            const makeProgram = (ch: string) => [
-                {
-                    start: new Date(
-                        now.getTime() - 1800000
-                    ).toISOString(),
-                    stop: new Date(
-                        now.getTime() + 1800000
-                    ).toISOString(),
-                    title: `Show on ${ch}`,
-                    channel: ch,
-                    desc: null,
-                    category: null,
-                },
-            ];
+            const makeBatchProgram = (ch: string) => ({
+                start: new Date(
+                    now.getTime() - 1800000
+                ).toISOString(),
+                stop: new Date(
+                    now.getTime() + 1800000
+                ).toISOString(),
+                title: `Show on ${ch}`,
+                channel: ch,
+                desc: null,
+                category: null,
+            });
 
-            mockElectron.getChannelPrograms.mockImplementation(
-                (channelId: string) =>
-                    Promise.resolve(makeProgram(channelId))
+            mockElectron.getCurrentProgramsBatch.mockImplementation(
+                (channelIds: string[]) => {
+                    const result: Record<string, any> = {};
+                    channelIds.forEach((id) => {
+                        result[id] = makeBatchProgram(id);
+                    });
+                    return Promise.resolve(result);
+                }
             );
 
             const result = await firstValueFrom(
@@ -415,18 +418,41 @@ describe('EpgService', () => {
                 },
             ];
 
+            const makeBatchProgram = (ch: string) => ({
+                start: new Date(
+                    now.getTime() - 1800000
+                ).toISOString(),
+                stop: new Date(
+                    now.getTime() + 1800000
+                ).toISOString(),
+                title: `Show on ${ch}`,
+                channel: ch,
+                desc: null,
+                category: null,
+            });
+
             mockElectron.getChannelPrograms.mockImplementation(
                 (channelId: string) =>
                     Promise.resolve(makeProgram(channelId))
             );
 
-            // Pre-cache ch1
+            mockElectron.getCurrentProgramsBatch.mockImplementation(
+                (channelIds: string[]) => {
+                    const result: Record<string, any> = {};
+                    channelIds.forEach((id) => {
+                        result[id] = makeBatchProgram(id);
+                    });
+                    return Promise.resolve(result);
+                }
+            );
+
+            // Pre-cache ch-mix-1 via single-channel fetch
             await firstValueFrom(
                 service.getCurrentProgramForChannel('ch-mix-1')
             );
             expect(mockElectron.getChannelPrograms).toHaveBeenCalledTimes(1);
 
-            // Batch request with cached ch1 and uncached ch2
+            // Batch request with cached ch-mix-1 and uncached ch-mix-2
             const result = await firstValueFrom(
                 service.getCurrentProgramsForChannels([
                     'ch-mix-1',
@@ -437,8 +463,8 @@ describe('EpgService', () => {
             expect(result.size).toBe(2);
             expect(result.get('ch-mix-1')?.title).toBe('Show on ch-mix-1');
             expect(result.get('ch-mix-2')?.title).toBe('Show on ch-mix-2');
-            // ch1 was cached, so only ch2 should trigger a new fetch
-            expect(mockElectron.getChannelPrograms).toHaveBeenCalledTimes(2);
+            // ch-mix-1 was cached, so batch only fetches ch-mix-2
+            expect(mockElectron.getCurrentProgramsBatch).toHaveBeenCalledWith(['ch-mix-2']);
         });
 
         it('should return all cached values when all are cached', async () => {

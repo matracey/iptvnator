@@ -1,7 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { TranslateService } from '@ngx-translate/core';
-import { BehaviorSubject, forkJoin, from, Observable, of } from 'rxjs';
+import { BehaviorSubject, from, Observable, of } from 'rxjs';
 import { catchError, map, tap, timeout } from 'rxjs/operators';
 import { EpgProgram } from 'shared-interfaces';
 
@@ -178,6 +178,7 @@ export class EpgService {
 
     /**
      * Gets current programs for multiple channels (batch operation)
+     * Uses a single IPC call instead of N+1 individual calls.
      * @param channelIds Array of channel IDs
      * @returns Observable of Map with channelId -> current program
      */
@@ -211,22 +212,45 @@ export class EpgService {
             return of(resultMap);
         }
 
-        // Fetch uncached channels with timeout and error handling per request
-        const fetchObservables = channelsToFetch.map((channelId) =>
-            this.getCurrentProgramForChannel(channelId).pipe(
-                timeout(5000), // 5 second timeout per request
-                map((program) => ({ channelId, program })),
-                catchError(() => of({ channelId, program: null }))
-            )
-        );
+        // Single batch IPC call for all uncached channels
+        return from(
+            window.electron.getCurrentProgramsBatch(channelsToFetch)
+        ).pipe(
+            timeout(10000),
+            map(
+                (
+                    batchResult: Record<string, EpgProgram | null>
+                ) => {
+                    for (const channelId of channelsToFetch) {
+                        const program = batchResult[channelId] ?? null;
+                        const normalizedProgram = program
+                            ? {
+                                  ...program,
+                                  start: new Date(program.start).toISOString(),
+                                  stop: new Date(program.stop).toISOString(),
+                              }
+                            : null;
 
-        // Combine all fetches using forkJoin
-        return forkJoin(fetchObservables).pipe(
-            map((results) => {
-                results.forEach((result) => {
-                    resultMap.set(result.channelId, result.program);
-                });
-                return resultMap;
+                        resultMap.set(channelId, normalizedProgram);
+                        this.programCache.set(channelId, {
+                            program: normalizedProgram,
+                            timestamp: now,
+                        });
+                    }
+                    return resultMap;
+                }
+            ),
+            catchError((err) => {
+                console.error('EPG batch fetch error:', err);
+                // Set null for all unfetched channels
+                for (const channelId of channelsToFetch) {
+                    resultMap.set(channelId, null);
+                    this.programCache.set(channelId, {
+                        program: null,
+                        timestamp: now,
+                    });
+                }
+                return of(resultMap);
             })
         );
     }

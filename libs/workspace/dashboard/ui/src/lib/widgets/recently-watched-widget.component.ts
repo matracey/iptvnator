@@ -107,8 +107,6 @@ export class RecentlyWatchedWidgetComponent implements OnInit {
             }))
     );
 
-    constructor() {}
-
     ngOnInit(): void {
         this.data.reloadGlobalRecentItems().then(() => {
             this.visibleItemLimit.set(INITIAL_PAGE_SIZE);

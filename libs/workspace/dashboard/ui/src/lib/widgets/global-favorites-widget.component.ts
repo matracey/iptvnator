@@ -108,8 +108,6 @@ export class GlobalFavoritesWidgetComponent implements OnInit {
             }))
     );
 
-    constructor() {}
-
     ngOnInit(): void {
         this.data.reloadGlobalFavorites().then(() => {
             this.visibleItemLimit.set(INITIAL_PAGE_SIZE);

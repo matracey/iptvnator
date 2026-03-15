@@ -12,7 +12,6 @@ import {
 } from '@angular/core';
 import { TranslatePipe } from '@ngx-translate/core';
 import { Channel, EpgProgram } from 'shared-interfaces';
-import { EnrichedChannel } from '../all-channels-view/all-channels-view.component';
 import { ChannelListItemComponent } from '../channel-list-item/channel-list-item.component';
 
 @Component({
@@ -51,24 +50,31 @@ export class FavoritesViewComponent {
     readonly favoritesReordered = output<string[]>();
 
     /**
-     * Computed signal for enriched favorites with EPG data
+     * Side-car EPG metadata map keyed by channel EPG ID.
+     * Rebuilt every progressTick (~30 s) but only creates entries for channels with EPG data.
      */
-    readonly enrichedFavorites = computed(() => {
-        const favorites = this.favorites();
+    readonly epgMetadataMap = computed(() => {
         const epgMap = this.channelEpgMap();
-        // Read progressTick to trigger recalculation
-        this.progressTick();
-
-        return favorites.map((channel) => {
-            const channelId = channel?.tvg?.id?.trim() || channel?.name?.trim();
-            const epgProgram = channelId ? epgMap.get(channelId) : null;
-            return {
-                ...channel,
-                epgProgram,
-                progressPercentage: this.calculateProgress(epgProgram),
-            } as EnrichedChannel;
+        this.progressTick(); // dependency for refresh
+        const result = new Map<
+            string,
+            {
+                epgProgram: EpgProgram | null | undefined;
+                progressPercentage: number;
+            }
+        >();
+        epgMap.forEach((program, channelId) => {
+            result.set(channelId, {
+                epgProgram: program,
+                progressPercentage: this.calculateProgress(program),
+            });
         });
+        return result;
     });
+
+    getChannelEpgKey(channel: Channel): string {
+        return channel?.tvg?.id?.trim() || channel?.name?.trim() || '';
+    }
 
     /**
      * Calculates progress percentage for an EPG program

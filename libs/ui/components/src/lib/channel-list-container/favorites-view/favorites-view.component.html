@@ -4,9 +4,9 @@
     (cdkDropListDropped)="onDrop($event)"
     id="favorites-list"
 >
-    @if (enrichedFavorites().length > 0) {
+    @if (favorites().length > 0) {
         @for (
-            channel of enrichedFavorites();
+            channel of favorites();
             track trackByFn($index, channel);
             let i = $index
         ) {
@@ -20,8 +20,8 @@
                 [isDraggable]="true"
                 [logo]="channel?.tvg?.logo"
                 [showEpg]="shouldShowEpg()"
-                [epgProgram]="channel.epgProgram"
-                [progressPercentage]="channel.progressPercentage"
+                [epgProgram]="epgMetadataMap().get(getChannelEpgKey(channel))?.epgProgram"
+                [progressPercentage]="epgMetadataMap().get(getChannelEpgKey(channel))?.progressPercentage ?? 0"
                 (clicked)="onChannelClick(channel)"
                 [selected]="activeChannelUrl() === channel?.url"
                 [showFavoriteButton]="true"

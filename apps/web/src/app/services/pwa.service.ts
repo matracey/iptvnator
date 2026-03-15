@@ -52,6 +52,7 @@ interface ErrorStatus {
     providedIn: 'root',
 })
 export class PwaService extends DataService {
+    private messageListeners = new Map<string, EventListener>();
     private readonly http = inject(HttpClient);
     private readonly snackBar = inject(MatSnackBar);
     private readonly store = inject(Store);
@@ -481,11 +482,20 @@ export class PwaService extends DataService {
     }
 
     removeAllListeners(): void {
-        // not implemented
+        this.messageListeners.forEach((listener) =>
+            window.removeEventListener('message', listener)
+        );
+        this.messageListeners.clear();
     }
 
-    listenOn(_command: string, callback: (...args: unknown[]) => void): void {
-        window.addEventListener('message', callback);
+    listenOn(command: string, callback: (...args: unknown[]) => void): void {
+        const existing = this.messageListeners.get(command);
+        if (existing) {
+            window.removeEventListener('message', existing);
+        }
+        const listener = callback as EventListener;
+        window.addEventListener('message', listener);
+        this.messageListeners.set(command, listener);
     }
 
     getAppEnvironment(): string {

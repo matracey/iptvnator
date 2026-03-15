@@ -15,13 +15,6 @@ import { Channel, EpgProgram } from 'shared-interfaces';
 import { EpgListItemComponent } from './epg-list-item/epg-list-item.component';
 import { EpgListComponent } from './epg-list.component';
 
-jest.mock('moment', () => {
-    const actualMoment = jest.requireActual('moment');
-    const fn = actualMoment.default || actualMoment;
-    fn.default = fn;
-    return fn;
-});
-
 describe('EpgListComponent', () => {
     let component: EpgListComponent;
     let fixture: ComponentFixture<EpgListComponent>;

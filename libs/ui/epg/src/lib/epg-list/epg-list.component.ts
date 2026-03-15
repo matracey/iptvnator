@@ -22,7 +22,7 @@ import {
     selectActive,
     EpgActions,
 } from 'm3u-state';
-import moment from 'moment';
+import { format, parseISO, subDays, addDays, compareAsc } from 'date-fns';
 import { BehaviorSubject, combineLatest, map } from 'rxjs';
 import { EpgChannel, EpgProgram } from 'shared-interfaces';
 import { EpgListItemComponent } from './epg-list-item/epg-list-item.component';
@@ -32,7 +32,7 @@ export interface EpgData {
     items: EpgProgram[];
 }
 
-const DATE_FORMAT = 'YYYY-MM-DD';
+const DATE_FORMAT = 'yyyy-MM-dd';
 
 @Component({
     imports: [
@@ -103,12 +103,12 @@ export class EpgListComponent implements OnInit {
         }),
         map((value) => {
             const days = Number(value ?? 0) || 0;
-            return moment().subtract(days, 'days').toISOString();
+            return subDays(new Date(), days).toISOString();
         })
     );
 
     private readonly selectedDate$ = new BehaviorSubject<string>(
-        moment().format(DATE_FORMAT)
+        format(new Date(), DATE_FORMAT)
     );
     readonly programList = viewChild<ElementRef<HTMLElement>>('programList');
     private scrollScheduled = false;
@@ -119,9 +119,9 @@ export class EpgListComponent implements OnInit {
             items
                 .filter(
                     (item) =>
-                        moment(item.start).format('YYYY-MM-DD') === selectedDate
+                        format(parseISO(item.start), 'yyyy-MM-dd') === selectedDate
                 )
-                .sort((a, b) => moment(a.start).diff(moment(b.start)))
+                .sort((a, b) => compareAsc(parseISO(a.start), parseISO(b.start)))
         )
     );
 
@@ -193,7 +193,7 @@ export class EpgListComponent implements OnInit {
         );
 
         this.items$.subscribe((programs) => this.handleEpgData(programs));
-        this.dateToday = moment().format(DATE_FORMAT);
+        this.dateToday = format(new Date(), DATE_FORMAT);
         this.selectedDate$.next(this.dateToday);
     }
 
@@ -203,7 +203,7 @@ export class EpgListComponent implements OnInit {
      */
     handleEpgData(programs: EpgProgram[]): void {
         this.timeNow = new Date().toISOString();
-        this.dateToday = moment().format(DATE_FORMAT);
+        this.dateToday = format(new Date(), DATE_FORMAT);
 
         // Dispatch EPG availability flag
         this.store.dispatch(
@@ -227,18 +227,18 @@ export class EpgListComponent implements OnInit {
      * Selects the program based on the active date
      */
     selectPrograms(programs: { payload: EpgData }): EpgProgram[] {
-        const selectedDate = moment(this.dateToday).format('YYYY-MM-DD');
+        const selectedDate = this.dateToday;
         return programs.payload?.items
             .filter(
                 (item) =>
-                    moment(item.start).format('YYYY-MM-DD') === selectedDate
+                    format(parseISO(item.start), 'yyyy-MM-dd') === selectedDate
             )
             .map((program) => ({
                 ...program,
                 start: program.start, // Keep ISO format
                 stop: program.stop, // Keep ISO format
             }))
-            .sort((a, b) => moment(a.start).diff(moment(b.start)));
+            .sort((a, b) => compareAsc(parseISO(a.start), parseISO(b.start)));
     }
 
     /**
@@ -246,9 +246,11 @@ export class EpgListComponent implements OnInit {
      * @param direction direction to switch
      */
     changeDate(direction: 'next' | 'prev'): void {
-        const newDate = moment(this.selectedDate$.value)
-            [direction === 'next' ? 'add' : 'subtract'](1, 'days')
-            .format(DATE_FORMAT);
+        const current = parseISO(this.selectedDate$.value);
+        const newDate = format(
+            direction === 'next' ? addDays(current, 1) : subDays(current, 1),
+            DATE_FORMAT
+        );
 
         this.dateToday = newDate;
         this.selectedDate$.next(newDate);
@@ -335,7 +337,7 @@ export class EpgListComponent implements OnInit {
     }
 
     private scheduleScrollToCurrentProgram(): void {
-        if (this.selectedDate$.value !== moment().format(DATE_FORMAT)) {
+        if (this.selectedDate$.value !== format(new Date(), DATE_FORMAT)) {
             return;
         }
 

@@ -88,35 +88,41 @@ export class AllChannelsViewComponent implements OnDestroy {
     }
 
     /**
-     * Computed signal for filtered and enriched channels.
+     * Filtered channels (no cloning — just a subset reference).
      */
-    readonly enrichedChannels = computed(() => {
+    readonly filteredChannels = computed(() => {
         const term = this.searchTerm().toLowerCase();
         const channels = this.channels();
-        const epgMap = this.channelEpgMap();
-        // Read progressTick to create dependency for progress refresh
-        this.progressTick();
-
-        let result = channels;
-
-        // Filter if search term exists
-        if (term) {
-            result = channels.filter((ch) =>
-                ch.name?.toLowerCase().includes(term)
-            );
-        }
-
-        // Enrich with EPG data and pre-calculate progress
-        return result.map((channel) => {
-            const channelId = channel?.tvg?.id?.trim() || channel?.name?.trim();
-            const epgProgram = channelId ? epgMap.get(channelId) : null;
-            return {
-                ...channel,
-                epgProgram,
-                progressPercentage: this.calculateProgress(epgProgram),
-            } as EnrichedChannel;
-        });
+        if (!term) return channels;
+        return channels.filter((ch) => ch.name?.toLowerCase().includes(term));
     });
+
+    /**
+     * Side-car EPG metadata map keyed by channel EPG ID.
+     * Rebuilt every progressTick (~30 s) but only touches channels that have EPG data.
+     */
+    readonly epgMetadataMap = computed(() => {
+        const epgMap = this.channelEpgMap();
+        this.progressTick(); // dependency for refresh
+        const result = new Map<
+            string,
+            {
+                epgProgram: EpgProgram | null | undefined;
+                progressPercentage: number;
+            }
+        >();
+        epgMap.forEach((program, channelId) => {
+            result.set(channelId, {
+                epgProgram: program,
+                progressPercentage: this.calculateProgress(program),
+            });
+        });
+        return result;
+    });
+
+    getChannelEpgKey(channel: Channel): string {
+        return channel?.tvg?.id?.trim() || channel?.name?.trim() || '';
+    }
 
     /**
      * Handles debounced search input

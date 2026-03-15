@@ -13,7 +13,7 @@
     </mat-form-field>
 </div>
 <div id="all-channels" class="channel-list">
-    @if (enrichedChannels().length === 0 && searchTerm()) {
+    @if (filteredChannels().length === 0 && searchTerm()) {
         <div class="no-results">
             <mat-icon class="no-results-icon">search_off</mat-icon>
             <div class="no-results-title">
@@ -30,7 +30,7 @@
         >
             <app-channel-list-item
                 *cdkVirtualFor="
-                    let channel of enrichedChannels();
+                    let channel of filteredChannels();
                     index as i;
                     trackBy: trackByFn
                 "
@@ -42,8 +42,8 @@
                 "
                 [logo]="channel?.tvg?.logo"
                 [showEpg]="shouldShowEpg()"
-                [epgProgram]="channel.epgProgram"
-                [progressPercentage]="channel.progressPercentage"
+                [epgProgram]="epgMetadataMap().get(getChannelEpgKey(channel))?.epgProgram"
+                [progressPercentage]="epgMetadataMap().get(getChannelEpgKey(channel))?.progressPercentage ?? 0"
                 (clicked)="onChannelClick(channel)"
                 [selected]="activeChannelUrl() === channel?.url"
                 [showFavoriteButton]="true"

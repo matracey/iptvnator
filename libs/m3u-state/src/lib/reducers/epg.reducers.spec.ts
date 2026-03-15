@@ -2,32 +2,6 @@ import { Channel, EpgProgram } from 'shared-interfaces';
 import { EpgActions } from '../actions';
 import { initialState, PlaylistState } from '../state';
 
-// Mock moment before importing anything that uses it
-jest.mock('moment', () => {
-    const fn = (val?: any, _format?: string) => {
-        let d: Date;
-        if (typeof val === 'number') {
-            d = new Date(val);
-        } else if (typeof val === 'string' && _format === 'YYYYMMDDHHmm ZZ') {
-            // Parse EPG date format: '20240115120000 +0000'
-            const match = val.match(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})/);
-            if (match) {
-                const tz = val.includes('+') ? val.split(/\s+/).pop() : '+0000';
-                d = new Date(`${match[1]}-${match[2]}-${match[3]}T${match[4]}:${match[5]}:00${tz}`);
-            } else {
-                d = new Date(val);
-            }
-        } else {
-            d = val ? new Date(val) : new Date();
-        }
-        return {
-            unix: () => Math.floor(d.getTime() / 1000),
-        };
-    };
-    return { __esModule: true, default: fn };
-});
-
-// Import after mock is set up
 import { playlistReducer } from './index';
 
 const reducer = playlistReducer;

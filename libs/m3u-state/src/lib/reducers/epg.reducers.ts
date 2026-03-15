@@ -1,5 +1,5 @@
 import { on } from '@ngrx/store';
-import moment from 'moment';
+import { parse, getUnixTime } from 'date-fns';
 import { Channel } from 'shared-interfaces';
 import { EpgActions } from '../actions';
 import { PlaylistState } from '../state';
@@ -7,8 +7,8 @@ import { PlaylistState } from '../state';
 export const epgReducers = [
     on(EpgActions.setActiveEpgProgram, (state, action): PlaylistState => {
         const { program } = action;
-        const from = moment(program.start, 'YYYYMMDDHHmm ZZ').unix();
-        const now = moment(Date.now()).unix();
+        const from = getUnixTime(parse(program.start, 'yyyyMMddHHmmss XX', new Date()));
+        const now = Math.floor(Date.now() / 1000);
         const epgParams = `?utc=${from}&lutc=${now}`;
         return {
             ...state,

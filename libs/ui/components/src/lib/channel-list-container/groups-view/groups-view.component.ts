@@ -16,7 +16,6 @@ import { MatExpansionModule } from '@angular/material/expansion';
 import { MatIconModule } from '@angular/material/icon';
 import { TranslatePipe } from '@ngx-translate/core';
 import { Channel, EpgProgram } from 'shared-interfaces';
-import { EnrichedChannel } from '../all-channels-view/all-channels-view.component';
 import { ChannelListItemComponent } from '../channel-list-item/channel-list-item.component';
 
 @Component({
@@ -177,55 +176,30 @@ export class GroupsViewComponent implements AfterViewInit, OnDestroy {
     }
 
     /**
-     * Computed signal that memoizes enriched channels for all groups
+     * Side-car EPG metadata map keyed by channel EPG ID.
+     * Rebuilt every progressTick (~30 s) but only creates entries for channels with EPG data.
      */
-    private readonly enrichedGroupChannelsMap = computed(() => {
-        const grouped = this.groupedChannels();
+    readonly epgMetadataMap = computed(() => {
         const epgMap = this.channelEpgMap();
-        // Read progressTick to create dependency for progress refresh
-        this.progressTick();
-
-        const result = new Map<string, EnrichedChannel[]>();
-        for (const [groupKey, channels] of Object.entries(grouped)) {
-            result.set(
-                groupKey,
-                channels.map((channel) => {
-                    const channelId =
-                        channel?.tvg?.id?.trim() || channel?.name?.trim();
-                    const epgProgram = channelId ? epgMap.get(channelId) : null;
-                    return {
-                        ...channel,
-                        epgProgram,
-                        progressPercentage: this.calculateProgress(epgProgram),
-                    } as EnrichedChannel;
-                })
-            );
-        }
+        this.progressTick(); // dependency for refresh
+        const result = new Map<
+            string,
+            {
+                epgProgram: EpgProgram | null | undefined;
+                progressPercentage: number;
+            }
+        >();
+        epgMap.forEach((program, channelId) => {
+            result.set(channelId, {
+                epgProgram: program,
+                progressPercentage: this.calculateProgress(program),
+            });
+        });
         return result;
     });
 
-    /**
-     * Gets enriched channels for a specific group from the memoized map
-     */
-    getEnrichedGroupChannels(
-        channels: Channel[],
-        groupKey?: string
-    ): EnrichedChannel[] {
-        // If groupKey provided, use memoized map
-        if (groupKey !== undefined) {
-            return this.enrichedGroupChannelsMap().get(groupKey) || [];
-        }
-        // Fallback for direct channel array (shouldn't happen with proper template usage)
-        const epgMap = this.channelEpgMap();
-        return channels.map((channel) => {
-            const channelId = channel?.tvg?.id?.trim() || channel?.name?.trim();
-            const epgProgram = channelId ? epgMap.get(channelId) : null;
-            return {
-                ...channel,
-                epgProgram,
-                progressPercentage: this.calculateProgress(epgProgram),
-            } as EnrichedChannel;
-        });
+    getChannelEpgKey(channel: Channel): string {
+        return channel?.tvg?.id?.trim() || channel?.name?.trim() || '';
     }
 
     /**

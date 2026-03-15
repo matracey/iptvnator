@@ -12,8 +12,49 @@ on:
     workflow_dispatch:
 
 jobs:
+    test:
+        name: Lint and Test
+        runs-on: ubuntu-latest
+        timeout-minutes: 15
+        permissions:
+            contents: read
+            issues: read
+            checks: write
+            pull-requests: write
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Install pnpm
+              uses: pnpm/action-setup@v4
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: '22'
+                  cache: 'pnpm'
+
+            - name: Install dependencies
+              run: pnpm install --frozen-lockfile
+
+            - name: Lint
+              run: pnpm lint:all
+
+            - name: Run tests
+              run: pnpm test:ci
+              env:
+                  JEST_JUNIT_OUTPUT_DIR: test-results
+                  JEST_JUNIT_UNIQUE_OUTPUT_NAME: 'true'
+
+            - name: Publish Test Results
+              uses: EnricoMi/publish-unit-test-result-action@v2
+              if: (!cancelled())
+              with:
+                  files: test-results/**/*.xml
+
     build:
         name: Build on ${{ matrix.os }} ${{ matrix.arch }}
+        needs: test
         runs-on: ${{ matrix.runner }}
         timeout-minutes: 60
         strategy:

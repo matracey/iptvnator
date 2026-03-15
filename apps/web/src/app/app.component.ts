@@ -1,4 +1,4 @@
-import { Component, HostBinding, inject, OnInit } from '@angular/core';
+import { ChangeDetectionStrategy, Component, HostBinding, inject, OnInit } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Router, RouterOutlet } from '@angular/router';
@@ -24,6 +24,7 @@ import { SettingsService } from './services/settings.service';
     selector: 'app-root',
     templateUrl: './app.component.html',
     imports: [EpgProgressPanelComponent, RouterOutlet],
+    changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AppComponent implements OnInit {
     @HostBinding('class.macos-platform') get isMacOS() {

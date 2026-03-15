@@ -1,11 +1,14 @@
 import { CommonModule } from '@angular/common';
 import {
+    ChangeDetectionStrategy,
+    ChangeDetectorRef,
     Component,
     ElementRef,
     effect,
     inject,
     Injector,
     Input,
+    NgZone,
     OnDestroy,
     OnInit,
     signal,
@@ -87,6 +90,7 @@ interface ThemeOption {
         MatDialogModule,
         QRCodeComponent,
     ],
+    changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SettingsComponent implements OnInit, OnDestroy {
     private dialogService = inject(DialogService);
@@ -102,6 +106,8 @@ export class SettingsComponent implements OnInit, OnDestroy {
     private matDialog = inject(MatDialog);
     private readonly elementRef = inject(ElementRef<HTMLElement>);
     private readonly injector = inject(Injector);
+    private readonly cdr = inject(ChangeDetectorRef);
+    private readonly ngZone = inject(NgZone);
     private readonly dialogData = inject<{ isDialog: boolean } | null>(
         MAT_DIALOG_DATA,
         { optional: true }
@@ -427,6 +433,7 @@ export class SettingsComponent implements OnInit, OnDestroy {
                 'SETTINGS.LATEST_VERSION'
             );
         }
+        this.cdr.markForCheck();
     }
 
     /**
@@ -591,20 +598,36 @@ export class SettingsComponent implements OnInit, OnDestroy {
         input.accept = 'application/json';
 
         input.addEventListener('change', (event: Event) => {
-            const target = event.target as HTMLInputElement;
-            const file = target.files?.[0];
+            this.ngZone.run(() => {
+                const target = event.target as HTMLInputElement;
+                const file = target.files?.[0];
 
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = () => {
-                    const contents = reader.result;
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                        const contents = reader.result;
 
-                    try {
-                        const parsedPlaylists: Playlist[] = JSON.parse(
-                            contents.toString()
-                        );
+                        try {
+                            const parsedPlaylists: Playlist[] = JSON.parse(
+                                contents.toString()
+                            );
 
-                        if (!Array.isArray(parsedPlaylists)) {
+                            if (!Array.isArray(parsedPlaylists)) {
+                                this.snackBar.open(
+                                    this.translate.instant('SETTINGS.IMPORT_ERROR'),
+                                    null,
+                                    {
+                                        duration: 2000,
+                                    }
+                                );
+                            } else {
+                                this.store.dispatch(
+                                    PlaylistActions.addManyPlaylists({
+                                        playlists: parsedPlaylists,
+                                    })
+                                );
+                            }
+                        } catch (error) {
                             this.snackBar.open(
                                 this.translate.instant('SETTINGS.IMPORT_ERROR'),
                                 null,
@@ -612,26 +635,12 @@ export class SettingsComponent implements OnInit, OnDestroy {
                                     duration: 2000,
                                 }
                             );
-                        } else {
-                            this.store.dispatch(
-                                PlaylistActions.addManyPlaylists({
-                                    playlists: parsedPlaylists,
-                                })
-                            );
+                            console.error(error);
                         }
-                    } catch (error) {
-                        this.snackBar.open(
-                            this.translate.instant('SETTINGS.IMPORT_ERROR'),
-                            null,
-                            {
-                                duration: 2000,
-                            }
-                        );
-                        console.error(error);
-                    }
-                };
-                reader.readAsText(file);
-            }
+                    };
+                    reader.readAsText(file);
+                }
+            });
         });
 
         input.click();

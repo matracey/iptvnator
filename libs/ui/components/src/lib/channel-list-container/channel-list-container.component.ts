@@ -232,12 +232,11 @@ export class ChannelListContainerComponent implements OnInit, OnDestroy {
         this.channelList$,
     ]).pipe(
         map(([favoriteChannelIds, channelList]) => {
+            const channelsByUrl = new Map(
+                channelList.map((ch) => [ch.url, ch] as const)
+            );
             return favoriteChannelIds
-                .map((favoriteChannelId) =>
-                    channelList.find(
-                        (channel) => channel.url === favoriteChannelId
-                    )
-                )
+                .map((id) => channelsByUrl.get(id))
                 .filter((channel): channel is Channel => channel !== undefined);
         })
     );

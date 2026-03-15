@@ -40,9 +40,8 @@ describe('EpgService', () => {
         jest.spyOn(snackBar, 'open');
         dispatchSpy = jest.spyOn(store, 'dispatch');
 
-        // Suppress console.error during tests
-        jest.spyOn(console, 'error').mockImplementation(() => {});
-        jest.spyOn(console, 'log').mockImplementation(() => {});
+        jest.spyOn(console, 'error').mockImplementation(() => undefined);
+        jest.spyOn(console, 'log').mockImplementation(() => undefined);
     });
 
     afterEach(() => {

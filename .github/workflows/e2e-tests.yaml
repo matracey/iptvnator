@@ -12,8 +12,14 @@ jobs:
   e2e-tests:
     name: E2E on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      issues: read
+      checks: write
+      pull-requests: write
     env:
       NX_SKIP_NX_CACHE: true
+      PLAYWRIGHT_JUNIT_OUTPUT_NAME: e2e-results.xml
     strategy:
       fail-fast: false
       matrix:
@@ -42,15 +48,36 @@ jobs:
 
       - name: Run E2E Tests (Linux)
         if: runner.os == 'Linux'
-        run: xvfb-run --auto-servernum --server-args="-screen 0 1280x960x24" pnpm nx run electron-backend-e2e:e2e
+        run: xvfb-run --auto-servernum --server-args="-screen 0 1280x960x24" pnpm nx run electron-backend-e2e:e2e -- --reporter=list --reporter=junit
         env:
           CI: true
 
       - name: Run E2E Tests (Windows/Mac)
         if: runner.os != 'Linux'
-        run: pnpm nx run electron-backend-e2e:e2e
+        run: pnpm nx run electron-backend-e2e:e2e -- --reporter=list --reporter=junit
         env:
           CI: true
+
+      - name: Publish E2E Test Results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: (!cancelled()) && runner.os == 'Linux'
+        with:
+          files: e2e-results.xml
+          check_name: E2E Test Results (${{ matrix.os }})
+
+      - name: Publish E2E Test Results (macOS)
+        uses: EnricoMi/publish-unit-test-result-action/macos@v2
+        if: (!cancelled()) && runner.os == 'macOS'
+        with:
+          files: e2e-results.xml
+          check_name: E2E Test Results (${{ matrix.os }})
+
+      - name: Publish E2E Test Results (Windows)
+        uses: EnricoMi/publish-unit-test-result-action/windows@v2
+        if: (!cancelled()) && runner.os == 'Windows'
+        with:
+          files: e2e-results.xml
+          check_name: E2E Test Results (${{ matrix.os }})
 
       - name: Upload Test Results
         if: failure()

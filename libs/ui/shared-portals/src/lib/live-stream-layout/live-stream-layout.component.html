@@ -41,7 +41,9 @@
                         [class.selected]="
                             item.stream_id === activeLiveStream?.stream_id
                         "
+                        tabindex="0"
                         (click)="itemClicked.emit(item)"
+                        (keydown.enter)="itemClicked.emit(item)"
                     >
                         @if (item.stream_icon) {
                             <img

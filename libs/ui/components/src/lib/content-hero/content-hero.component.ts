@@ -1,4 +1,4 @@
-import { Component, computed, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { NgxSkeletonLoaderComponent } from 'ngx-skeleton-loader';
@@ -9,6 +9,7 @@ import { NgxSkeletonLoaderComponent } from 'ngx-skeleton-loader';
     imports: [MatIconModule, MatButtonModule, NgxSkeletonLoaderComponent],
     templateUrl: './content-hero.component.html',
     styleUrls: ['./content-hero.component.scss'],
+    changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ContentHeroComponent {
     readonly title = input<string>();

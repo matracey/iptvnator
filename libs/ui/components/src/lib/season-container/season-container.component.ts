@@ -1,5 +1,6 @@
 import { KeyValuePipe } from '@angular/common';
 import {
+    ChangeDetectionStrategy,
     Component,
     OnInit,
     inject,
@@ -77,6 +78,7 @@ function parseDuration(duration: string | number | undefined): number {
         TranslateModule,
         WatchedBadgeComponent,
     ],
+    changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SeasonContainerComponent implements OnInit {
     private readonly downloadsService = inject(DownloadsService);

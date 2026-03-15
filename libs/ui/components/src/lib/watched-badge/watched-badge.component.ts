@@ -1,4 +1,4 @@
-import { Component, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 import { MatIcon } from '@angular/material/icon';
 
 @Component({
@@ -37,6 +37,7 @@ import { MatIcon } from '@angular/material/icon';
             }
         `,
     ],
+    changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class WatchedBadgeComponent {
     readonly isWatched = input.required<boolean>();

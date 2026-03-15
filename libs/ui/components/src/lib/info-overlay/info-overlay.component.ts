@@ -1,5 +1,5 @@
 import { NgStyle } from '@angular/common';
-import { Component, Input, OnChanges, SimpleChanges } from '@angular/core';
+import { ChangeDetectionStrategy, Component, Input, OnChanges, signal, SimpleChanges } from '@angular/core';
 import { MomentDatePipe } from '@iptvnator/pipes';
 import { TranslatePipe } from '@ngx-translate/core';
 import moment from 'moment';
@@ -10,6 +10,7 @@ import { Channel, EpgProgram } from 'shared-interfaces';
     selector: 'app-info-overlay',
     templateUrl: './info-overlay.component.html',
     styleUrls: ['./info-overlay.component.scss'],
+    changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class InfoOverlayComponent implements OnChanges {
     /** Active channel */
@@ -19,7 +20,7 @@ export class InfoOverlayComponent implements OnChanges {
     @Input() epgProgram: EpgProgram | undefined;
 
     /** Visibility flag of the overlay popup  */
-    isVisible = false;
+    readonly isVisible = signal(false);
 
     /** Program duration */
     generalDuration!: number;
@@ -43,9 +44,9 @@ export class InfoOverlayComponent implements OnChanges {
     ngOnChanges(changes: SimpleChanges): void {
         if (changes['channel'] && changes['channel'].currentValue) {
             clearTimeout(this.currentTimeout);
-            this.isVisible = true;
+            this.isVisible.set(true);
             this.currentTimeout = setTimeout(() => {
-                this.isVisible = false;
+                this.isVisible.set(false);
             }, 10000);
         }
         if (changes['epgProgram']) {
@@ -88,16 +89,16 @@ export class InfoOverlayComponent implements OnChanges {
      * Toggles visibility if already shown, or shows for 10 seconds if hidden
      */
     showOverlay(): void {
-        if (this.isVisible) {
+        if (this.isVisible()) {
             // If already visible, hide it (toggle behavior)
             clearTimeout(this.currentTimeout);
-            this.isVisible = false;
+            this.isVisible.set(false);
         } else {
             // Show overlay for 10 seconds
             clearTimeout(this.currentTimeout);
-            this.isVisible = true;
+            this.isVisible.set(true);
             this.currentTimeout = setTimeout(() => {
-                this.isVisible = false;
+                this.isVisible.set(false);
             }, 10000);
         }
     }

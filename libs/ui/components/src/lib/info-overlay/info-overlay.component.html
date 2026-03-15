@@ -1,8 +1,8 @@
 @if (channel) {
     <div
         class="channel-overlay"
-        [class.visible]="isVisible"
-        [class.hidden]="!isVisible"
+        [class.visible]="isVisible()"
+        [class.hidden]="!isVisible()"
     >
         @if (epgProgram) {
             <!-- Layout with EPG data -->

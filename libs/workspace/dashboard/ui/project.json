@@ -2,7 +2,7 @@
     "name": "workspace-dashboard-ui",
     "$schema": "../../../../node_modules/nx/schemas/project-schema.json",
     "sourceRoot": "libs/workspace/dashboard/ui/src",
-    "prefix": "lib",
+    "prefix": "app",
     "projectType": "library",
     "tags": ["scope:workspace", "domain:workspace", "type:ui"],
     "targets": {
